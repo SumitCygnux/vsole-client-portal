@@ -8,27 +8,39 @@ type AuthState = {
     email: string
     name: string
     phone?: string
+    role?: string
   } | null
 }
 
 const initialState: AuthState = {
-  isAuthenticated: false,
-  user: null,
+  isAuthenticated: !!localStorage.getItem('authToken'),
+  user: localStorage.getItem('authToken') ? {
+    company: localStorage.getItem('customerCompany') || '',
+    email: localStorage.getItem('customerEmail') || '',
+    name: localStorage.getItem('customerName') || '',
+    phone: localStorage.getItem('customerPhone') || '',
+    role: localStorage.getItem('customerRole') || 'customer',
+  } : null,
 }
 
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    login: (state, action: PayloadAction<{ email?: string } | undefined>) => {
-      const email = action.payload?.email ?? 'vsole@yopmail.com'
+    login: (state, action: PayloadAction<{ email?: string; name?: string; role?: string; phone?: string; company?: string } | undefined>) => {
+      const email = action.payload?.email ?? ''
+      const name = action.payload?.name ?? ''
+      const role = action.payload?.role ?? 'customer'
+      const phone = action.payload?.phone ?? ''
+      const company = action.payload?.company ?? ''
 
       state.isAuthenticated = true
       state.user = {
-        company: 'VSOLE Solar Energy Pvt. Ltd.',
+        company,
         email,
-        name: 'John Doe',
-        phone: '+91 98765 43210',
+        name,
+        phone,
+        role,
       }
     },
     logout: (state) => {

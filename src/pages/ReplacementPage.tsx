@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -7,8 +7,12 @@ import {
   SwapOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { AutoComplete, Input, Select, message } from 'antd'
+import { Input, Select, message } from 'antd'
 import dayjs from 'dayjs'
+
+import { get, post } from '@/helpers/api_helper'
+import { CREATE_REPLACEMENT_DETAIL, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN } from '@/helpers/url_helper'
+import { useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -18,39 +22,36 @@ const { TextArea } = Input
 
 type Complaint = {
   id: string
+  complaint_no: string
   capacity: string
   serialNo: string
   phase: string
   status: 'open' | 'closed'
+  company_id?: string
+  location_id?: string
+  fin_year?: string
 }
 
-const mockComplaints: Complaint[] = [
-  { id: 'CMP-2026-0001', capacity: '5 kW', serialNo: 'SN-VSL-10234', phase: 'Single Phase', status: 'open' },
-  { id: 'CMP-2026-0002', capacity: '10 kW', serialNo: 'SN-VSL-10456', phase: 'Three Phase', status: 'open' },
+
+
+
+const typeOfFormOptions = [
+  { label: 'Replacement', value: 'replacement' },
+  { label: 'Repair', value: 'repair' },
+  { label: 'Replacement Test', value: 'replacement_test' },
 ]
-
-const pincodeStateMap: Record<string, string> = {
-  '380001': 'Gujarat',
-  '400001': 'Maharashtra',
-  '110001': 'Delhi',
-}
-
-const typeOfFormOptions = [{ label: 'Replacement', value: 'replacement' }]
-
-let formCounter = 1
-
-function generateFormNo() {
-  return `RPL-${dayjs().format('YYYYMMDD')}-${String(formCounter++).padStart(4, '0')}`
-}
 
 type FormErrors = Record<string, string>
 
 function ReplacementPage() {
-  const [formNo] = useState(() => generateFormNo())
+  const [searchParams] = useSearchParams()
+  const complaintQuery = searchParams.get('complaint_no')
+
   const [formDate] = useState(() => dayjs())
 
   const [complaintSearch, setComplaintSearch] = useState('')
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
+  const [complaintError, setComplaintError] = useState('')
 
   const [capacityRight, setCapacityRight] = useState<boolean | null>(null)
   const [serialNoRight, setSerialNoRight] = useState<boolean | null>(null)
@@ -68,54 +69,100 @@ function ReplacementPage() {
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
 
-  const state = useMemo(
-    () => (pincode.length === 6 ? pincodeStateMap[pincode] ?? '' : ''),
-    [pincode],
-  )
+  const [pincodes, setPincodes] = useState<any[]>([])
 
-  const openComplaints = useMemo(
-    () => mockComplaints.filter((c) => c.status === 'open'),
-    [],
-  )
+  useEffect(() => {
+    const fetchPincodes = async () => {
+      try {
+        const res = await get(GET_PIN_DROPDOWN)
+        if (res.status) setPincodes(res.data)
+      } catch (error) {
+        console.error(error)
+      }
+    }
+    fetchPincodes()
+  }, [])
 
-  const complaintOptions = useMemo(
-    () =>
-      openComplaints
-        .filter((c) => c.id.toLowerCase().includes(complaintSearch.toLowerCase()))
-        .map((c) => ({
-          label: (
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold text-[#0F172A]">{c.id}</span>
-              <span className="rounded-full bg-[#EAF0FF] px-2.5 py-1 text-xs font-semibold text-[#315BFF]">
-                {c.capacity} - {c.phase}
-              </span>
-            </div>
-          ),
-          value: c.id,
-        })),
-    [complaintSearch, openComplaints],
-  )
+  useEffect(() => {
+    if (complaintQuery) {
+      setComplaintSearch(complaintQuery)
+    }
+  }, [complaintQuery])
 
-  const handleComplaintSelect = useCallback(
-    (value: string) => {
-      const complaint = openComplaints.find((c) => c.id === value)
+  const state = useMemo(() => {
+    if (pincode.length === 6) {
+      const p = pincodes.find((pin) => (pin.pinCode || pin.pin_name) === pincode)
+      return p ? (p.state_id?.name || p.state_id?.state_name || '') : ''
+    }
+    return ''
+  }, [pincode, pincodes])
+
+
+
+
+
+  const [verifying, setVerifying] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (complaintSearch.length > 3) {
+        verifyComplaint(complaintSearch)
+      } else if (!complaintSearch) {
+        setSelectedComplaint(null)
+        setComplaintError('')
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [complaintSearch])
+
+  const verifyComplaint = async (value: string) => {
+    setVerifying(true)
+    try {
+      const res = await get(`${GET_COMPLAINT_BY_NO}/${encodeURIComponent(value)}`)
+      const complaint = res.data
 
       if (complaint) {
-        setSelectedComplaint(complaint)
-        setComplaintSearch(complaint.id)
-        setCapacityRight(null)
-        setSerialNoRight(null)
-        setCorrectCapacity('')
-        setCorrectSerialNo('')
-        setErrors((prev) => {
-          const next = { ...prev }
-          delete next.complaintNo
-          return next
-        })
+        if (complaint.status !== 'closed' && complaint.status !== 'resolved' && complaint.status !== 'cancelled') {
+          setSelectedComplaint({
+            id: complaint.id,
+            complaint_no: complaint.complaint_no,
+            capacity: complaint.product_type_name || complaint.capacity || '-',
+            serialNo: complaint.serial_number || complaint.serialNo || '-',
+            phase: complaint.phase && complaint.phase !== '-' ? (complaint.phase.toLowerCase().includes('phase') ? complaint.phase : `${complaint.phase}-Phase`) : '1-Phase',
+            status: complaint.status,
+            company_id: complaint.company_id,
+            location_id: complaint.location_id,
+            fin_year: complaint.fin_year
+          })
+          setComplaintError('')
+          setCapacityRight(null)
+          setSerialNoRight(null)
+          setCorrectCapacity('')
+          setCorrectSerialNo('')
+          setErrors((prev) => {
+            const next = { ...prev }
+            delete next.complaintNo
+            return next
+          })
+        } else {
+          setSelectedComplaint(null)
+          setComplaintError('This complaint is closed or resolved.')
+        }
+      } else {
+        setSelectedComplaint(null)
+        setComplaintError('Complaint not found.')
       }
-    },
-    [openComplaints],
-  )
+    } catch (error) {
+      setSelectedComplaint(null)
+      setComplaintError('Complaint not found or invalid.')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const handleComplaintVerify = (value: string) => {
+    setComplaintSearch(value)
+  }
 
   const validate = useCallback(() => {
     const newErrors: FormErrors = {}
@@ -153,6 +200,7 @@ function ReplacementPage() {
   const resetForm = () => {
     setComplaintSearch('')
     setSelectedComplaint(null)
+    setComplaintError('')
     setCapacityRight(null)
     setSerialNoRight(null)
     setCorrectCapacity('')
@@ -174,10 +222,39 @@ function ReplacementPage() {
     }
 
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1200))
-    message.success('Replacement form submitted successfully.')
-    setSubmitting(false)
-    resetForm()
+    try {
+      const payload = {
+        complaint_id: selectedComplaint?.id,
+        complaint_number: selectedComplaint?.complaint_no,
+        date: formDate.toISOString(),
+        capacity: capacityRight === false ? correctCapacity : selectedComplaint?.capacity,
+        serial_no: serialNoRight === false ? correctSerialNo : selectedComplaint?.serialNo,
+        phase: selectedComplaint?.phase,
+        capacity_right: capacityRight,
+        serial_no_right: serialNoRight,
+        epc_name: epcName,
+        epc_gst_no: epcGstNo,
+        dispatch_address: dispatchAddress,
+        pincode,
+        state,
+        client_contact_no: clientContactNo,
+        type_of_form: typeOfForm,
+        remarks: remark,
+        is_form_fill: true,
+        company_id: selectedComplaint?.company_id,
+        location_id: selectedComplaint?.location_id,
+        fin_year: selectedComplaint?.fin_year,
+      }
+
+      await post(CREATE_REPLACEMENT_DETAIL, payload)
+      message.success('Replacement form submitted successfully.')
+      resetForm()
+    } catch (error) {
+      console.error('Failed to submit form:', error)
+      message.error('Failed to submit replacement form. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const fieldError = (key: string) =>
@@ -201,21 +278,14 @@ function ReplacementPage() {
               title="Replacement Form"
               description="Create a replacement request from an active complaint, verify product details, and prepare dispatch in one clean flow."
               actions={
-                <>
-                <span className="rounded-full border border-[#DCE5F4] bg-white px-3 py-1.5 text-xs font-extrabold text-[#526174] shadow-[0_6px_14px_rgba(15,23,42,0.04)]">
-                  {formNo}
-                </span>
                 <span className="rounded-full bg-[#FFF7E6] px-3 py-1.5 text-xs font-extrabold text-[#D97706] shadow-[0_6px_14px_rgba(246,180,0,0.12)]">
                   Draft
                 </span>
-                </>
               }
             />
 
-            <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1 max-sm:gap-3">
-              <InfoPill label="Form No" value={formNo} icon={<FileTextOutlined />} tone="blue" />
+            <div className="grid grid-cols-3 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1 max-sm:gap-3">
               <InfoPill label="Date" value={formDate.format('DD MMM YYYY')} icon={<CheckCircleOutlined />} tone="green" />
-              <InfoPill label="Open Complaints" value={String(openComplaints.length).padStart(2, '0')} icon={<SwapOutlined />} tone="cyan" />
               <InfoPill label="Status" value="Draft" icon={<FileTextOutlined />} tone="amber" />
             </div>
           </div>
@@ -224,186 +294,191 @@ function ReplacementPage() {
         <Card className="overflow-hidden rounded-2xl border border-[#DCE2F1] bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)] max-sm:rounded-xl [&_.ant-card-body]:!p-0">
           <div className="grid gap-5 p-6 max-sm:gap-3 max-sm:p-3">
             <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
-            <SectionTitle icon={<FileTextOutlined />} title="Request Information" subtitle="Generated request details and complaint selection" />
+              <SectionTitle icon={<FileTextOutlined />} title="Request Information" subtitle="Generated request details and complaint selection" />
 
-            <div className="mt-5 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <ReadOnlyField label="Form Number" value={formNo} />
-              <ReadOnlyField label="Date" value={formDate.format('DD MMM YYYY')} />
+              <div className="mt-5 grid grid-cols-2 gap-4 max-lg:grid-cols-1 max-sm:grid-cols-1">
+                <ReadOnlyField label="Date" value={formDate.format('DD MMM YYYY')} />
 
-              <div>
-                <FieldLabel label="Complaint No" required />
-                <AutoComplete
-                  className="w-full [&_.ant-input]:!rounded-xl"
-                  options={complaintOptions}
-                  value={complaintSearch}
-                  onSearch={setComplaintSearch}
-                  onSelect={handleComplaintSelect}
-                  allowClear
-                  onClear={() => {
-                    setSelectedComplaint(null)
-                    setComplaintSearch('')
-                  }}
-                >
+                <div>
+                  <FieldLabel label="Complaint No" required />
                   <Input
                     size="large"
                     prefix={<SearchOutlined className="text-[#0B63CE]" />}
-                    placeholder="Search open complaint"
+                    placeholder="Enter complaint number"
                     className="!rounded-xl"
+                    value={complaintSearch}
+                    onChange={(e) => handleComplaintVerify(e.target.value)}
+                    disabled={verifying || !!complaintQuery}
+                    status={errors.complaintNo || complaintError ? 'error' : undefined}
                   />
-                </AutoComplete>
-                {fieldError('complaintNo')}
+                  {(errors.complaintNo || complaintError) ? (
+                    <span className="mt-1.5 block text-xs font-medium text-red-500">
+                      {errors.complaintNo || complaintError}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
-            </div>
 
             <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
-            <SectionTitle icon={<SwapOutlined />} title="Complaint Details" subtitle="Filled automatically after selecting a complaint" />
+              <SectionTitle icon={<SwapOutlined />} title="Complaint Details" subtitle="Filled automatically after selecting a complaint" />
 
-            <div className="mt-5 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <ReadOnlyField label="Capacity" value={selectedComplaint?.capacity || '-'} highlight={!!selectedComplaint} />
-              <ReadOnlyField label="Serial No" value={selectedComplaint?.serialNo || '-'} highlight={!!selectedComplaint} />
-              <ReadOnlyField label="Phase" value={selectedComplaint?.phase || '-'} highlight={!!selectedComplaint} />
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-              <ToggleBox
-                label="Capacity Right?"
-                value={capacityRight}
-                error={errors.capacityRight}
-                onChange={(value) => {
-                  setCapacityRight(value)
-                  if (value) setCorrectCapacity('')
-                  setErrors((prev) => {
-                    const next = { ...prev }
-                    delete next.capacityRight
-                    delete next.correctCapacity
-                    return next
-                  })
-                }}
-              >
-                {capacityRight === false && (
-                  <>
-                    <Input
-                      size="large"
-                      className="mt-4 !rounded-xl"
-                      placeholder="Enter correct capacity"
-                      value={correctCapacity}
-                      onChange={(e) => setCorrectCapacity(e.target.value)}
-                      status={errors.correctCapacity ? 'error' : undefined}
-                    />
-                    {fieldError('correctCapacity')}
-                  </>
-                )}
-              </ToggleBox>
-
-              <ToggleBox
-                label="Serial No Right?"
-                value={serialNoRight}
-                error={errors.serialNoRight}
-                onChange={(value) => {
-                  setSerialNoRight(value)
-                  if (value) setCorrectSerialNo('')
-                  setErrors((prev) => {
-                    const next = { ...prev }
-                    delete next.serialNoRight
-                    delete next.correctSerialNo
-                    return next
-                  })
-                }}
-              >
-                {serialNoRight === false && (
-                  <>
-                    <Input
-                      size="large"
-                      className="mt-4 !rounded-xl"
-                      placeholder="Enter correct serial number"
-                      value={correctSerialNo}
-                      onChange={(e) => setCorrectSerialNo(e.target.value)}
-                      status={errors.correctSerialNo ? 'error' : undefined}
-                    />
-                    {fieldError('correctSerialNo')}
-                  </>
-                )}
-              </ToggleBox>
-            </div>
-            </div>
-
-            <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
-            <SectionTitle icon={<FileTextOutlined />} title="EPC And Dispatch" subtitle="Partner, GST, and delivery information" />
-
-            <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-              <FormInput label="EPC Name" required value={epcName} onChange={setEpcName} error={errors.epcName} placeholder="Enter EPC name" />
-              <FormInput label="EPC GST No" required value={epcGstNo} onChange={setEpcGstNo} error={errors.epcGstNo} placeholder="Enter GST number" />
-            </div>
-
-            <div className="mt-5">
-              <FieldLabel label="Dispatch Address" required />
-              <TextArea
-                rows={3}
-                className="!rounded-xl"
-                placeholder="Enter full dispatch address"
-                value={dispatchAddress}
-                onChange={(e) => setDispatchAddress(e.target.value)}
-                status={errors.dispatchAddress ? 'error' : undefined}
-              />
-              {fieldError('dispatchAddress')}
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <FormInput
-                label="Pincode"
-                required
-                value={pincode}
-                onChange={(value) => setPincode(value.replace(/\D/g, ''))}
-                error={errors.pincode}
-                placeholder="6-digit pincode"
-                maxLength={6}
-              />
-
-              <ReadOnlyField label="State" value={state || '-'} highlight={!!state} />
-
-              <FormInput
-                label="Client Contact No"
-                required
-                value={clientContactNo}
-                onChange={(value) => setClientContactNo(value.replace(/\D/g, ''))}
-                error={errors.clientContactNo}
-                placeholder="10-digit number"
-                maxLength={10}
-              />
-            </div>
-
-            {fieldError('state')}
-            </div>
-
-            <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
-            <SectionTitle icon={<CheckCircleOutlined />} title="Classification" subtitle="Request type and internal remark" />
-
-            <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-              <div>
-                <FieldLabel label="Type Of Form" required />
-                <Select
-                  size="large"
-                  className="w-full [&_.ant-select-selector]:!rounded-xl"
-                  options={typeOfFormOptions}
-                  value={typeOfForm}
-                  onChange={setTypeOfForm}
-                  status={errors.typeOfForm ? 'error' : undefined}
-                />
-                {fieldError('typeOfForm')}
+              <div className="mt-5 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                <ReadOnlyField label="Capacity" value={selectedComplaint?.capacity || '-'} highlight={!!selectedComplaint} />
+                <ReadOnlyField label="Serial No" value={selectedComplaint?.serialNo || '-'} highlight={!!selectedComplaint} />
+                <ReadOnlyField label="Phase" value={selectedComplaint?.phase || '-'} highlight={!!selectedComplaint} />
               </div>
 
-              <div>
-                <FieldLabel label="Remark" />
+              <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                <ToggleBox
+                  label="Capacity Right?"
+                  value={capacityRight}
+                  error={errors.capacityRight}
+                  onChange={(value) => {
+                    setCapacityRight(value)
+                    if (value) setCorrectCapacity('')
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.capacityRight
+                      delete next.correctCapacity
+                      return next
+                    })
+                  }}
+                >
+                  {capacityRight === false && (
+                    <>
+                      <Input
+                        size="large"
+                        className="mt-4 !rounded-xl"
+                        placeholder="Enter correct capacity"
+                        value={correctCapacity}
+                        onChange={(e) => setCorrectCapacity(e.target.value)}
+                        status={errors.correctCapacity ? 'error' : undefined}
+                      />
+                      {fieldError('correctCapacity')}
+                    </>
+                  )}
+                </ToggleBox>
+
+                <ToggleBox
+                  label="Serial No Right?"
+                  value={serialNoRight}
+                  error={errors.serialNoRight}
+                  onChange={(value) => {
+                    setSerialNoRight(value)
+                    if (value) setCorrectSerialNo('')
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.serialNoRight
+                      delete next.correctSerialNo
+                      return next
+                    })
+                  }}
+                >
+                  {serialNoRight === false && (
+                    <>
+                      <Input
+                        size="large"
+                        className="mt-4 !rounded-xl"
+                        placeholder="Enter correct serial number"
+                        value={correctSerialNo}
+                        onChange={(e) => setCorrectSerialNo(e.target.value)}
+                        status={errors.correctSerialNo ? 'error' : undefined}
+                      />
+                      {fieldError('correctSerialNo')}
+                    </>
+                  )}
+                </ToggleBox>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
+              <SectionTitle icon={<FileTextOutlined />} title="EPC And Dispatch" subtitle="Partner, GST, and delivery information" />
+
+              <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                <FormInput label="EPC Name" required value={epcName} onChange={setEpcName} error={errors.epcName} placeholder="Enter EPC name" />
+                <FormInput label="EPC GST No" required value={epcGstNo} onChange={setEpcGstNo} error={errors.epcGstNo} placeholder="Enter GST number" />
+              </div>
+
+              <div className="mt-5">
+                <FieldLabel label="Dispatch Address" required />
                 <TextArea
                   rows={3}
                   className="!rounded-xl"
-                  placeholder="Enter remark"
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="Enter full dispatch address"
+                  value={dispatchAddress}
+                  onChange={(e) => setDispatchAddress(e.target.value)}
+                  status={errors.dispatchAddress ? 'error' : undefined}
+                />
+                {fieldError('dispatchAddress')}
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                <div>
+                  <FieldLabel label="Pincode" required />
+                  <Select
+                    showSearch
+                    placeholder="6-digit pincode"
+                    optionFilterProp="children"
+                    className="w-full [&_.ant-select-selector]:!rounded-xl"
+                    size="large"
+                    value={pincode || undefined}
+                    onChange={(val) => setPincode(val)}
+                    status={errors.pincode ? 'error' : undefined}
+                  >
+                    {pincodes.map((p) => (
+                      <Select.Option key={p.id} value={p.pinCode || p.pin_name}>
+                        {p.pinCode || p.pin_name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                  {fieldError('pincode')}
+                </div>
+
+                <ReadOnlyField label="State" value={state || '-'} highlight={!!state} />
+
+                <FormInput
+                  label="Client Contact No"
+                  required
+                  value={clientContactNo}
+                  onChange={(value) => setClientContactNo(value.replace(/\D/g, ''))}
+                  error={errors.clientContactNo}
+                  placeholder="10-digit number"
+                  maxLength={10}
                 />
               </div>
+
+              {fieldError('state')}
             </div>
+
+            <div className="rounded-xl border border-[#E5EAF4] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)] max-sm:p-4">
+              <SectionTitle icon={<CheckCircleOutlined />} title="Classification" subtitle="Request type and internal remark" />
+
+              <div className="mt-5 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                <div>
+                  <FieldLabel label="Type Of Form" required />
+                  <Select
+                    size="large"
+                    className="w-full [&_.ant-select-selector]:!rounded-xl"
+                    options={typeOfFormOptions}
+                    value={typeOfForm}
+                    onChange={setTypeOfForm}
+                    status={errors.typeOfForm ? 'error' : undefined}
+                  />
+                  {fieldError('typeOfForm')}
+                </div>
+
+                <div>
+                  <FieldLabel label="Remark" />
+                  <TextArea
+                    rows={3}
+                    className="!rounded-xl"
+                    placeholder="Enter remark"
+                    value={remark}
+                    onChange={(e) => setRemark(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#E5EAF4] pt-1 max-sm:grid max-sm:grid-cols-2">

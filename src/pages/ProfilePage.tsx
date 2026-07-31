@@ -1,5 +1,5 @@
-import { EditOutlined, MailOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons'
-import { Form, message } from 'antd'
+import { EditOutlined, MailOutlined, PhoneOutlined, UserOutlined, CheckCircleFilled, CameraOutlined } from '@ant-design/icons'
+import { Form, message, Tooltip } from 'antd'
 import { useState } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -10,7 +10,6 @@ import { useAppSelector } from '@/hooks/useAppSelector'
 import { updateProfile } from '@/store/slices/authSlice'
 
 type ProfileFormValues = {
-  company?: string
   email: string
   name: string
   phone?: string
@@ -28,7 +27,6 @@ function ProfilePage() {
   const user = useAppSelector((state) => state.auth.user)
 
   const initialValues: ProfileFormValues = {
-    company: user?.company ?? 'VSOLE Solar Energy Pvt. Ltd.',
     email: user?.email ?? 'client@vsole.com',
     name: user?.name ?? 'VSOLE Solar Energy Pvt. Ltd.',
     phone: user?.phone ?? '+91 98765 43210',
@@ -48,162 +46,190 @@ function ProfilePage() {
   }
 
   return (
-    <>
+    <div className="pb-10">
       <PageHeader
-        title="Profile"
-        description="Manage client account details and contact information."
+        title="Account Profile"
+        description="Manage your personal information and preferences securely."
       />
 
-      <div className="grid grid-cols-[minmax(260px,0.38fr)_minmax(0,0.62fr)] gap-4 max-lg:grid-cols-1">
-        <Card className="overflow-hidden [&_.ant-card-body]:!p-0">
-          <div className="bg-[#EDF4FF] bg-[length:20px_20px] bg-[linear-gradient(#D7E4FF_1px,transparent_1px),linear-gradient(90deg,#D7E4FF_1px,transparent_1px)] px-6 py-8 text-center">
-            <span className="mx-auto grid size-20 place-items-center rounded-full border-4 border-white bg-[linear-gradient(145deg,#7C8CFF,#7451C8)] text-2xl font-bold text-white shadow-[0_16px_34px_rgba(91,110,245,0.24)]">
-              {initials}
-            </span>
-            <h3 className="mt-4 text-lg font-bold text-[#0F172A]">{initialValues.name}</h3>
-            <p className="mt-1 text-sm text-[#64748B]">{initialValues.email}</p>
-          </div>
-
-          <div className="grid gap-3 p-5">
-            <div className="flex items-center gap-3 rounded-lg bg-[#F8FAFC] p-3">
-              <span className="grid size-9 place-items-center rounded-lg bg-[#ECFDF3] text-[#16A34A]">
-                <PhoneOutlined />
-              </span>
-              <div>
-                <span className="block text-xs text-[#64748B]">Phone</span>
-                <strong className="text-sm text-[#0F172A]">{initialValues.phone}</strong>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg bg-[#F8FAFC] p-3">
-              <span className="grid size-9 place-items-center rounded-lg bg-[#FFFBEB] text-[#D97706]">
-                <MailOutlined />
-              </span>
-              <div>
-                <span className="block text-xs text-[#64748B]">Email Status</span>
-                <strong className="text-sm text-[#16A34A]">Verified</strong>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          cardVariant="form"
-          title={
-            <span className="text-base font-semibold text-[#0F172A]">
-              {isEditing ? 'Update Profile' : 'Profile Details'}
-            </span>
-          }
-        >
-          {isEditing ? (
-            <Form
-              className="grid grid-cols-2 gap-x-4 max-md:grid-cols-1"
-              form={form}
-              initialValues={initialValues}
-              layout="vertical"
-              onFinish={handleFinish}
+      {/* Modern Profile Header */}
+      <div className="relative mb-8 mt-4 rounded-3xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+        <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-[linear-gradient(145deg,#283354_0%,#465692_48%,#6E7DE8_100%)]">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
+          {/* Action button on top right of cover */}
+          <div className="absolute right-4 top-4">
+            <Button
+              className="!border-white/20 !bg-white/10 !text-white backdrop-blur-md hover:!bg-white/20"
+              icon={<EditOutlined />}
+              onClick={handleEdit}
             >
-              <InputField
-                label="Client Name"
-                name="name"
-                prefix={<UserOutlined />}
-                rules={[{ required: true, message: 'Client name is required' }]}
-              />
-              <InputField
-                label="Company"
-                name="company"
-                rules={[{ required: true, message: 'Company name is required' }]}
-              />
-              <InputField
-                inputType="email"
-                label="Email"
-                name="email"
-                prefix={<MailOutlined />}
-                rules={[
-                  { required: true, message: 'Email is required' },
-                  { type: 'email', message: 'Enter a valid email address' },
-                ]}
-              />
-              <InputField
-                label="Phone"
-                name="phone"
-                prefix={<PhoneOutlined />}
-              />
-              <div className="col-span-2 mt-2 flex justify-end gap-2 border-t border-[#E5E7EB] pt-4 max-md:col-span-1 max-sm:flex-col">
-                <Button
-                  buttonVariant="secondary"
-                  onClick={() => {
-                    form.resetFields()
-                    setIsEditing(false)
-                  }}
-                  type="button"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  buttonVariant="secondary"
-                  onClick={() => form.resetFields()}
-                  type="button"
-                >
-                  Reset
-                </Button>
-                <Button htmlType="submit" type="primary">
-                  Update Profile
-                </Button>
-              </div>
-            </Form>
-          ) : (
-            <div className="grid gap-5">
-              <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-[#64748B]">
-                    Client Name
-                  </span>
-                  <div className="mt-2 flex items-center gap-2 text-base font-semibold text-[#0F172A]">
-                    <UserOutlined className="text-[#5B6EF5]" />
-                    {initialValues.name}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-[#64748B]">
-                    Company
-                  </span>
-                  <div className="mt-2 text-base font-semibold text-[#0F172A]">
-                    {initialValues.company}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-[#64748B]">
-                    Email
-                  </span>
-                  <div className="mt-2 flex items-center gap-2 text-base font-semibold text-[#0F172A]">
-                    <MailOutlined className="text-[#5B6EF5]" />
-                    {initialValues.email}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-[#64748B]">
-                    Phone
-                  </span>
-                  <div className="mt-2 flex items-center gap-2 text-base font-semibold text-[#0F172A]">
-                    <PhoneOutlined className="text-[#16A34A]" />
-                    {initialValues.phone}
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end border-t border-[#E5E7EB] pt-4">
-              <Button
-                icon={<EditOutlined />}
-                onClick={handleEdit}
-                type="button"
-              >
-                Edit Profile
-              </Button>
-              </div>
+              {isEditing ? 'Cancel Edit' : 'Edit Profile'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Floating Avatar & Basic Info */}
+        <div className="relative flex flex-col items-center px-4 pb-6 pt-0 sm:flex-row sm:px-8 sm:pb-8">
+          <div className="-mt-16 relative">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white bg-[linear-gradient(145deg,#283354_0%,#465692_48%,#6E7DE8_100%)] shadow-xl ring-4 ring-white/50 backdrop-blur-sm">
+              <span className="text-4xl font-bold tracking-wider text-white">
+                {initials}
+              </span>
             </div>
-          )}
-        </Card>
+            <div className="absolute bottom-1 right-1 grid size-8 cursor-pointer place-items-center rounded-full border-2 border-white bg-slate-800 text-white shadow-md transition-transform hover:scale-110">
+              <CameraOutlined className="text-sm" />
+            </div>
+          </div>
+
+          <div className="mt-4 text-center sm:ml-6 sm:mt-0 sm:text-left sm:pt-4">
+            <h1 className="flex items-center justify-center gap-2 text-2xl font-bold text-slate-900 sm:justify-start">
+              {initialValues.name}
+              <Tooltip title="Verified Account">
+                <CheckCircleFilled className="text-xl text-emerald-500" />
+              </Tooltip>
+            </h1>
+
+          </div>
+        </div>
       </div>
-    </>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left Side: Contact Stats */}
+        <div className="space-y-6 lg:col-span-1">
+          <Card className="rounded-2xl border-none shadow-sm ring-1 ring-slate-100/50 hover:shadow-md transition-shadow">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
+              Contact Overview
+            </h3>
+            <div className="space-y-4">
+              <div className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition-colors hover:bg-indigo-50/50">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <MailOutlined className="text-xl" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-500">Email Address</p>
+                  <p className="truncate text-sm font-semibold text-slate-800">{initialValues.email}</p>
+                </div>
+              </div>
+
+              <div className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition-colors hover:bg-emerald-50/50">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <PhoneOutlined className="text-xl" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-500">Phone Number</p>
+                  <p className="truncate text-sm font-semibold text-slate-800">{initialValues.phone}</p>
+                </div>
+              </div>
+
+
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Side: Details / Edit Form */}
+        <div className="lg:col-span-2">
+          <Card className="h-full rounded-2xl border-none shadow-sm ring-1 ring-slate-100/50">
+            <div className="mb-6 border-b border-slate-100 pb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">
+                {isEditing ? 'Update Your Information' : 'Personal Information'}
+              </h3>
+            </div>
+
+            {isEditing ? (
+              <Form
+                className="grid grid-cols-1 gap-x-6 sm:grid-cols-2"
+                form={form}
+                initialValues={initialValues}
+                layout="vertical"
+                onFinish={handleFinish}
+              >
+                <InputField
+                  label="Full Name"
+                  name="name"
+                  prefix={<UserOutlined className="text-slate-400" />}
+                  rules={[{ required: true, message: 'Full name is required' }]}
+                  formItemProps={{ className: 'sm:col-span-2' }}
+                />
+
+
+
+                <InputField
+                  inputType="email"
+                  label="Email Address"
+                  name="email"
+                  prefix={<MailOutlined className="text-slate-400" />}
+                  rules={[
+                    { required: true, message: 'Email is required' },
+                    { type: 'email', message: 'Enter a valid email address' },
+                  ]}
+                />
+
+                <InputField
+                  label="Phone Number"
+                  name="phone"
+                  prefix={<PhoneOutlined className="text-slate-400" />}
+                />
+
+                <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:col-span-2 sm:flex-row sm:items-center">
+                  <Button
+                    buttonVariant="secondary"
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      form.resetFields()
+                      setIsEditing(false)
+                    }}
+                    htmlType="button"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    className="w-full bg-indigo-600 hover:!bg-indigo-700 sm:w-auto"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </Form>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Full Name
+                  </span>
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <UserOutlined className="text-indigo-500" />
+                    <span className="font-semibold text-slate-800">{initialValues.name}</span>
+                  </div>
+                </div>
+
+
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Email Address
+                  </span>
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <MailOutlined className="text-indigo-500" />
+                    <span className="font-semibold text-slate-800">{initialValues.email}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Phone Number
+                  </span>
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <PhoneOutlined className="text-indigo-500" />
+                    <span className="font-semibold text-slate-800">{initialValues.phone}</span>
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 

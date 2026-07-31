@@ -73,6 +73,10 @@ function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   const handleProfileMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'logout') {
       dispatch(logout())
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('customerId')
+      localStorage.removeItem('customerEmail')
+      localStorage.removeItem('customerName')
       navigate(ROUTES.LOGIN, { replace: true })
       return
     }

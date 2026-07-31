@@ -4,9 +4,10 @@ import { useAppSelector } from '@/hooks/useAppSelector'
 
 const ProtectedRoute = () => {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
+  const hasToken = !!localStorage.getItem('authToken')
   const location = useLocation()
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !hasToken) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />
   }
 

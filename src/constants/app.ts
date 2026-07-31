@@ -1,6 +1,17 @@
 export const ROUTES = {
   LOGIN: '/login',
+  REGISTER: '/register',
   DASHBOARD: '/',
   PROFILE: '/profile',
   REPLACEMENT: '/replacement',
+  CUSTOMER_DASHBOARD: '/customer-dashboard',
+  REGISTER_PRODUCT: '/register-product',
+  MY_PRODUCTS: '/my-products',
+  WARRANTY_STATUS: '/warranty-status',
+  ADMIN_WARRANTY_REQUESTS: '/admin/warranty-requests',
+  ADMIN_WARRANTY_REQUEST_DETAILS: '/admin/warranty-requests/:id',
+  WARRANTY_CARD_PRINT: '/warranty-card/:id/print',
+  ADMIN_REPLACEMENT_REQUESTS: '/admin/replacement-requests',
+  ADMIN_REPLACEMENT_REQUEST_DETAILS: '/admin/replacement-requests/:id',
+  MY_REPLACEMENTS: '/my-replacements',
 } as const
