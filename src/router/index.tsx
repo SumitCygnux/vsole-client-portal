@@ -42,7 +42,7 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
-    path: '/replacement-form',
+    path: ROUTES.REPLACEMENT,
     element: <ReplacementPage />,
   },
   {
@@ -57,7 +57,6 @@ export const router = createBrowserRouter([
           { path: ROUTES.MY_PRODUCTS, element: <MyProductsPage /> },
           { path: ROUTES.WARRANTY_STATUS, element: <WarrantyStatusPage /> },
           { path: ROUTES.PROFILE, element: <ProfilePage /> },
-          { path: ROUTES.REPLACEMENT, element: <ReplacementPage /> },
           { path: ROUTES.MY_REPLACEMENTS, element: <MyReplacementRequestsPage /> },
           { path: ROUTES.WARRANTY_CARD_PRINT, element: <WarrantyCardPrint /> },
           {

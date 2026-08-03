@@ -1,7 +1,7 @@
 import { Col, Form, Input, Row, Typography, message, Button } from 'antd'
 import { useState, useEffect } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, type Location } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
 import { useAppDispatch } from '@/hooks/useAppDispatch'
 import { login } from '@/store/slices/authSlice'
@@ -21,6 +21,7 @@ type LoginFormValues = {
 function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
 
 
   const [step, setStep] = useState<'EMAIL' | 'OTP' | 'PASSWORD'>('EMAIL')
@@ -143,10 +144,12 @@ function LoginPage() {
           localStorage.setItem('authToken', data.accessToken);
         }
         message.success('Login successful!');
+        const locationState = location.state as { from?: Location };
+        const fromPath = locationState?.from?.pathname + (locationState?.from?.search || '');
         if (role === 'admin') {
-          navigate(ROUTES.ADMIN_WARRANTY_REQUESTS, { replace: true });
+          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.ADMIN_WARRANTY_REQUESTS, { replace: true });
         } else {
-          navigate(ROUTES.DASHBOARD, { replace: true });
+          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.DASHBOARD, { replace: true });
         }
       }
     } catch (e) {
