@@ -105,6 +105,7 @@ export default function RegisterProduct() {
               label={<Text strong>Serial Number</Text>}
               name="serialNumber"
               rules={[{ required: true, message: 'Please enter serial number' }]}
+              normalize={(value) => (value || '').replace(/\s/g, '')}
               style={{ flex: 1, margin: 0 }}
             >
               <Input
@@ -112,6 +113,7 @@ export default function RegisterProduct() {
                 placeholder="Enter 10-digit serial number"
                 style={{ borderRadius: '8px' }}
                 prefix={<SettingOutlined style={{ color: '#bfbfbf' }} />}
+                maxLength={10}
               />
             </Form.Item>
             <Button

@@ -23,6 +23,16 @@ import AdminReplacementDashboardDetails from '@/pages/AdminReplacementDashboard/
 import MyReplacementRequestsPage from '@/pages/MyReplacementRequestsPage'
 
 
+const ConditionalDashboardLayout = () => {
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
+  const hasToken = !!localStorage.getItem('authToken')
+
+  if (isAuthenticated && hasToken) {
+    return <DashboardLayout />
+  }
+  return <Outlet />
+}
+
 const AdminRoute = () => {
   const userRole = useAppSelector((state) => state.auth.user?.role) || localStorage.getItem('customerRole') || 'customer'
   if (userRole !== 'admin') {
@@ -42,8 +52,10 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
-    path: ROUTES.REPLACEMENT,
-    element: <ReplacementPage />,
+    element: <ConditionalDashboardLayout />,
+    children: [
+      { path: ROUTES.REPLACEMENT, element: <ReplacementPage /> },
+    ],
   },
   {
     element: <ProtectedRoute />,
