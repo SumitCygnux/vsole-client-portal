@@ -1,4 +1,4 @@
-import { Avatar, Dropdown, Input, Layout, message, Space } from 'antd'
+import { Avatar, Dropdown, Layout, message, Space } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   BellOutlined,
@@ -8,7 +8,6 @@ import {
   LogoutOutlined,
   MailOutlined,
   MenuOutlined,
-  SearchOutlined,
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -73,6 +72,10 @@ function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   const handleProfileMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'logout') {
       dispatch(logout())
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('customerId')
+      localStorage.removeItem('customerEmail')
+      localStorage.removeItem('customerName')
       navigate(ROUTES.LOGIN, { replace: true })
       return
     }
@@ -116,12 +119,6 @@ function AppHeader({ onToggleSidebar }: AppHeaderProps) {
           src={vsoleLogo}
         />
 
-        <Input
-          className="!ml-1 !h-9 !w-[200px] !rounded !border-[#D8DFF0] !bg-white !text-sm shadow-none placeholder:!text-[#9CA3AF] max-sm:hidden"
-          placeholder="Search..."
-          prefix={null}
-          suffix={<SearchOutlined className="text-[#4B5563]" />}
-        />
       </div>
 
       <Space size={8} className="shrink-0">

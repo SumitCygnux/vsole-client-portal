@@ -35,7 +35,7 @@ function DashboardLayout() {
         collapsedWidth={78}
         width={230}
         trigger={null}
-        className="!sticky !top-0 !h-dvh !bg-white"
+        className="!sticky !top-0 !h-dvh !bg-white !z-[999]"
       >
         <Sidebar
           collapsed={collapsed}

@@ -1,29 +1,168 @@
-import { Checkbox, Col, Form, Row, Space, Typography } from 'antd'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Col, Form, Input, Row, Typography, message, Button } from 'antd'
+import { useState, useEffect } from 'react'
+import { ReloadOutlined } from '@ant-design/icons'
+import { useNavigate, useLocation, type Location } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
-import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
-import { InputField } from '@/components/ui/InputField'
 import { useAppDispatch } from '@/hooks/useAppDispatch'
 import { login } from '@/store/slices/authSlice'
 import vsoleLogo from '@/assets/image/VsoleLogo.png'
+import { post } from '@/helpers/api_helper'
+import { SEND_OTP, LOGIN_CUSTOMER } from '@/helpers/url_helper'
 
 const { Link, Text, Title } = Typography
 
 type LoginFormValues = {
   email: string
-  password: string
+  captcha: string
+  otp?: string
+  password?: string
 }
 
 function LoginPage() {
   const dispatch = useAppDispatch()
-  const location = useLocation()
   const navigate = useNavigate()
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+  const location = useLocation()
 
-  const handleLogin = (values: LoginFormValues) => {
-    dispatch(login({ email: values.email }))
-    navigate(from ?? ROUTES.DASHBOARD, { replace: true })
+
+  const [step, setStep] = useState<'EMAIL' | 'OTP' | 'PASSWORD'>('EMAIL')
+  const [isLoading, setIsLoading] = useState(false)
+  const [captchaNum1, setCaptchaNum1] = useState(0)
+  const [captchaNum2, setCaptchaNum2] = useState(0)
+  const [form] = Form.useForm<LoginFormValues>()
+
+  useEffect(() => {
+    generateCaptcha()
+  }, [])
+
+  const generateCaptcha = () => {
+    setCaptchaNum1(Math.floor(Math.random() * 10) + 1)
+    setCaptchaNum2(Math.floor(Math.random() * 10) + 1)
+    form.setFieldsValue({ captcha: '' })
+  }
+
+  if (localStorage.getItem('authToken')) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#EEF3FF]">
+        <div style={{ textAlign: 'center', backgroundColor: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+          <Title level={3}>You are already logged in!</Title>
+          <Text style={{ display: 'block', marginBottom: '20px', color: '#6b7280' }}>
+            It looks like you're already authenticated as {localStorage.getItem('customerEmail') || 'a customer'}.
+          </Text>
+          <button
+            onClick={() => navigate(ROUTES.DASHBOARD)}
+            style={{
+              padding: '12px 24px', backgroundColor: '#283046', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600
+            }}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  const handleSendOTP = async () => {
+    let values;
+    try {
+      values = await form.validateFields(['email', 'captcha'])
+    } catch (err) {
+      // Validation failed, UI will show the errors on the form fields
+      return;
+    }
+
+    const expectedSum = captchaNum1 + captchaNum2
+    if (parseInt(values.captcha) !== expectedSum) {
+      message.error('Invalid CAPTCHA! Please try again.')
+      generateCaptcha()
+      return
+    }
+
+    try {
+      setIsLoading(true);
+      const data = await post(SEND_OTP, { email: values.email.trim(), action: 'login' });
+      setIsLoading(false);
+
+      if (data.status) {
+        if (data.role === 'admin') {
+          message.info('Please enter your admin password.')
+          setStep('PASSWORD')
+        } else {
+          message.success(`OTP sent to ${values.email.trim()}!`)
+          setStep('OTP')
+        }
+      } else {
+        message.error(data.message || 'Failed to send OTP')
+      }
+    } catch (error) {
+      setIsLoading(false);
+      const errorData = (error as any).response?.data;
+      if (errorData?.isRegistered === false) {
+        message.warning('Account not found. Redirecting to Register page...');
+        navigate(ROUTES.REGISTER, { state: { email: values.email.trim() } });
+      } else {
+        message.error(errorData?.message || 'Failed to send OTP. Please try again.');
+      }
+    }
+  }
+
+  const handleLogin = async (values: LoginFormValues) => {
+    if (step === 'EMAIL') {
+      handleSendOTP()
+      return
+    }
+
+    if (step === 'OTP' && !values.otp) {
+      message.error('Please enter the OTP.')
+      return
+    }
+
+    if (step === 'PASSWORD' && !values.password) {
+      message.error('Please enter your password.')
+      return
+    }
+
+    try {
+      setIsLoading(true);
+      const payload: any = { email: values.email };
+      if (step === 'OTP') payload.otp = values.otp;
+      if (step === 'PASSWORD') payload.password = values.password;
+
+      const data = await post(LOGIN_CUSTOMER, payload);
+      setIsLoading(false);
+
+      if (data.status) {
+        const name = data.data.full_name || data.data.name || '';
+        const role = data.data.role || 'customer';
+        const phone = data.data.mobile_no || '';
+        dispatch(login({ email: values.email, name, role, phone }));
+        localStorage.setItem('customerId', data.data.id);
+        localStorage.setItem('customerEmail', data.data.email);
+        localStorage.setItem('customerName', name);
+        localStorage.setItem('customerRole', role);
+        localStorage.setItem('customerPhone', phone);
+        if (data.accessToken) {
+          localStorage.setItem('authToken', data.accessToken);
+        }
+        message.success('Login successful!');
+        const locationState = location.state as { from?: Location };
+        const fromPath = locationState?.from?.pathname + (locationState?.from?.search || '');
+        if (role === 'admin') {
+          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.ADMIN_WARRANTY_REQUESTS, { replace: true });
+        } else {
+          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.DASHBOARD, { replace: true });
+        }
+      }
+    } catch (e) {
+      const errorData = (e as any).response?.data;
+      if (errorData?.message === 'Account not found') {
+        message.info('Account not found. Redirecting to Create Account...');
+        navigate(ROUTES.REGISTER, { state: { email: values.email } });
+      } else {
+        message.error(errorData?.message || 'Login request failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -80,59 +219,206 @@ function LoginPage() {
           xs={24}
         >
           <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-8 max-[980px]:min-h-0 max-[980px]:px-6 max-[980px]:py-14 max-sm:p-5">
-            <Card
-              className="w-[min(100%,460px)] border border-[#D9E2FF] bg-white shadow-[0_18px_48px_rgba(20,27,52,0.12)] [&_.ant-card-body]:!p-9 max-sm:[&_.ant-card-body]:!p-6"
-              bordered={false}
-            >
-              <Space direction="vertical" size={2}>
-                <Text className="mb-3 block text-xs font-extrabold uppercase !text-[#4258F5]">
-                  Welcome back
-                </Text>
-                <Title className="!m-0 !text-[30px] !font-bold !leading-10 !text-[#0B1220]" level={2}>
-                  Sign In
+            <div style={{
+              backgroundColor: '#ffffff',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '50px 40px',
+              borderRadius: '20px',
+              boxShadow: '0 20px 48px rgba(20,27,52,0.12)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <img src={vsoleLogo} alt="VSOLE Solar" style={{ height: '70px', marginBottom: '10px' }} />
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#666', letterSpacing: '2px', marginBottom: '20px' }}>
+                  CYGNUX SOFTTECH
+                </div>
+                <Title level={2} style={{ margin: '0 0 10px 0', color: '#1a1f36', fontWeight: 700 }}>
+                  Welcome Back
                 </Title>
-                <Text className="!text-sm !font-medium !text-[#475569]">
-                  Enter your client credentials to continue.
+                <Text style={{ color: '#6b7280', fontSize: '15px' }}>
+                  {step === 'PASSWORD'
+                    ? 'Please enter your admin password.'
+                    : 'Please login with your Email & OTP.'}
                 </Text>
-              </Space>
+              </div>
 
               <Form
-                className="mt-2 [&_.ant-checkbox-wrapper]:!text-[#0F172A] [&_.ant-form-item-label>label]:!text-sm [&_.ant-form-item-label>label]:!font-medium [&_.ant-form-item-label>label]:!text-[#0F172A] [&_.ant-form-item-label>label]:before:!text-[#EF4444] [&_.ant-form-item]:!mb-4 [&_.ant-input-affix-wrapper-focused]:!border-[#4258F5] [&_.ant-input-affix-wrapper-focused]:!shadow-[0_0_0_3px_rgba(66,88,245,0.12)] [&_.ant-input-affix-wrapper_.ant-input]:!bg-transparent [&_.ant-input-affix-wrapper]:!h-10 [&_.ant-input-affix-wrapper]:!rounded-lg [&_.ant-input-affix-wrapper]:!border-[#D7E0F0] [&_.ant-input-affix-wrapper]:!bg-[#F1F6FF] [&_.ant-input-affix-wrapper]:!px-3 [&_.ant-input-affix-wrapper]:!py-0 [&_.ant-input-password-icon]:!text-[#64748B] [&_.ant-input-focused]:!border-[#4258F5] [&_.ant-input-focused]:!shadow-[0_0_0_3px_rgba(66,88,245,0.12)] [&_.ant-input::placeholder]:!text-[#94A3B8] [&_.ant-input]:!h-10 [&_.ant-input]:!rounded-lg [&_.ant-input]:!border-[#D7E0F0] [&_.ant-input]:!bg-[#F1F6FF] [&_.ant-input]:!px-3 [&_.ant-input]:!py-0 [&_.ant-input]:!text-[#0F172A] [&_a]:!font-medium [&_a]:!text-[#2457FF]"
-                initialValues={{ email: 'client@vsole.com', password: '123456' }}
+                form={form}
                 layout="vertical"
                 onFinish={handleLogin}
+                size="large"
               >
-                <InputField
-                  label="Email"
+                <Form.Item
                   name="email"
-                  inputType="email"
-                  placeholder="client@company.com"
-                  rules={[{ required: true, message: 'Please enter your email' }]}
-                />
+                  rules={[
+                    { required: true, message: 'Please enter your email', transform: (value) => value?.trim() },
+                    { type: 'email', message: 'Please enter a valid email address', transform: (value) => value?.trim() }
+                  ]}
+                  normalize={(value) => value?.trim()}
+                  style={{ marginBottom: '24px', display: (step === 'OTP' || step === 'PASSWORD') ? 'none' : 'block' }}
+                >
+                  <Input
+                    placeholder="Email Address"
+                    disabled={step === 'OTP' || step === 'PASSWORD'}
+                    style={{
+                      borderRadius: '10px',
+                      height: '52px',
+                      padding: '0 16px',
+                      borderColor: '#e5e7eb',
+                      fontSize: '15px'
+                    }}
+                  />
+                </Form.Item>
 
-                <InputField
-                  label="Password"
-                  name="password"
-                  inputType="password"
-                  placeholder="Enter password"
-                  rules={[{ required: true, message: 'Please enter your password' }]}
-                />
-                <div className="-mt-1 mb-6 flex items-center justify-between gap-4">
-                  <Checkbox>Remember me</Checkbox>
-                  <Link>Forgot password?</Link>
+                {step === 'EMAIL' && (
+                  <Row gutter={16} align="middle" style={{ marginBottom: '24px' }}>
+                    <Col span={10}>
+                      <div style={{
+                        height: '52px',
+                        backgroundColor: '#f3f4f6',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        letterSpacing: '2px',
+                        color: '#374151',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        {captchaNum1} + {captchaNum2} = ?
+                      </div>
+                    </Col>
+                    <Col span={4} style={{ textAlign: 'center' }}>
+                      <Button
+                        type="text"
+                        icon={<ReloadOutlined style={{ fontSize: '20px', color: '#6b7280' }} />}
+                        onClick={generateCaptcha}
+                      />
+                    </Col>
+                    <Col span={10}>
+                      <Form.Item
+                        name="captcha"
+                        rules={[{ required: true, message: 'Solve CAPTCHA' }]}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Input
+                          placeholder="Answer"
+                          style={{
+                            borderRadius: '10px',
+                            height: '52px',
+                            padding: '0 16px',
+                            borderColor: '#e5e7eb',
+                            fontSize: '15px'
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                )}
+
+                {step === 'OTP' && (
+                  <Form.Item
+                    name="otp"
+                    rules={[{ required: true, message: 'Please enter the OTP' }]}
+                    style={{ marginBottom: '24px' }}
+                  >
+                    <Input
+                      placeholder="Enter 6-digit OTP"
+                      style={{
+                        borderRadius: '10px',
+                        height: '52px',
+                        padding: '0 16px',
+                        borderColor: '#e5e7eb',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </Form.Item>
+                )}
+
+                {step === 'PASSWORD' && (
+                  <Form.Item
+                    name="password"
+                    rules={[{ required: true, message: 'Please enter your password' }]}
+                    style={{ marginBottom: '24px' }}
+                  >
+                    <Input.Password
+                      placeholder="Enter Password"
+                      style={{
+                        borderRadius: '10px',
+                        height: '52px',
+                        padding: '0 16px',
+                        borderColor: '#e5e7eb',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </Form.Item>
+                )}
+
+                <Form.Item style={{ marginBottom: '24px' }}>
+                  {step === 'EMAIL' ? (
+                    <button
+                      type="button"
+                      onClick={handleSendOTP}
+                      style={{
+                        width: '100%',
+                        height: '52px',
+                        backgroundColor: '#283046',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        letterSpacing: '0.5px',
+                        boxShadow: '0 10px 22px rgba(40, 48, 70, 0.22)'
+                      }}
+                    >
+                      SUBMIT {isLoading ? '...' : ''}
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      style={{
+                        width: '100%',
+                        height: '52px',
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        letterSpacing: '0.5px',
+                        boxShadow: '0 10px 22px rgba(59, 130, 246, 0.3)'
+                      }}
+                    >
+                      {step === 'PASSWORD' ? 'LOGIN' : 'VERIFY OTP & LOG IN'} {isLoading ? '...' : ''}
+                    </button>
+                  )}
+                </Form.Item>
+
+                {step === 'OTP' && (
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <Text style={{ fontSize: '14px', color: '#6b7280' }}>
+                      Didn't receive the code? <Link onClick={handleSendOTP} style={{ color: '#3b82f6', fontWeight: 600, cursor: 'pointer' }}>Resend OTP</Link>
+                    </Text>
+                  </div>
+                )}
+
+                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                  <Text style={{ fontSize: '14px', color: '#6b7280' }}>
+                    Don't have an account? <Link href={ROUTES.REGISTER} style={{ color: '#3b82f6', fontWeight: 600 }}>Create Account</Link>
+                  </Text>
                 </div>
 
-                <Button
-                  block
-                  className="!h-10 !rounded-lg !border-0 !bg-[#4258F5] !font-semibold !text-white shadow-[0_10px_22px_rgba(66,88,245,0.22)] hover:!bg-[#3348E8]"
-                  htmlType="submit"
-                  size="large"
-                  type="primary"
-                >
-                  Login
-                </Button>
+                <div style={{ textAlign: 'center' }}>
+                  <Text style={{ fontSize: '12px', color: '#9ca3af' }}>
+                    By continuing, you agree to our <Link style={{ color: '#3b82f6' }}>Conditions</Link> & <Link style={{ color: '#3b82f6' }}>Privacy</Link>.
+                  </Text>
+                </div>
               </Form>
-            </Card>
+            </div>
           </div>
         </Col>
       </Row>

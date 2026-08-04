@@ -37,6 +37,7 @@
       opacity: 0;
       transform: translateY(-8px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -44,6 +45,7 @@
   }
 
   @keyframes solar-float {
+
     0%,
     100% {
       transform: translate3d(0, 0, 0);
@@ -55,6 +57,7 @@
   }
 
   @keyframes solar-panel-drift {
+
     0%,
     100% {
       transform: perspective(1100px) rotateX(60deg) rotateY(-8deg) rotateZ(-18deg) translate3d(0, 0, 0);
@@ -66,6 +69,7 @@
   }
 
   @keyframes solar-orbit {
+
     0%,
     100% {
       transform: translate3d(0, 0, 0) rotate(0deg);
@@ -77,6 +81,7 @@
   }
 
   @keyframes solar-glow {
+
     0%,
     100% {
       opacity: 0.72;
@@ -100,6 +105,7 @@
   }
 
   @keyframes panel-pop {
+
     0%,
     100% {
       transform: translateZ(0) scale(1);
@@ -138,4 +144,25 @@
     perspective: 1200px;
     transform-style: preserve-3d;
   }
+}
+
+/* Fix Ant Design Checkbox styling conflicts with Tailwind */
+.ant-checkbox .ant-checkbox-inner {
+  border-radius: 4px !important;
+  border-color: #1677ff !important;
+  background-color: #fff !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #1677ff !important;
+  border-color: #1677ff !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner::after {
+  border-color: #fff !important;
+  border-width: 2px !important;
+  border-right-width: 2px !important;
+  border-bottom-width: 2px !important;
+  transform: rotate(45deg) scale(1) translate(-50%,-50%) !important;
+  opacity: 1 !important;
 }

@@ -21,4 +21,11 @@ export const appTheme: ThemeConfig = {
     fontFamily:
       'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
+  components: {
+    Checkbox: {
+      colorBorder: '#1677ff',
+      colorPrimary: '#1677ff',
+      colorPrimaryHover: '#1677ff',
+    },
+  },
 }
