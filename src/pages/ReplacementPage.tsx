@@ -24,13 +24,6 @@ type Complaint = {
 
 
 
-
-const typeOfFormOptions = [
-  { label: 'Replacement', value: 'replacement' },
-  { label: 'Repair', value: 'repair' },
-  { label: 'Replacement Test', value: 'replacement_test' },
-]
-
 type FormErrors = Record<string, string>
 
 function ReplacementPage() {
@@ -107,7 +100,7 @@ function ReplacementPage() {
   const verifyComplaint = async (value: string) => {
     setVerifying(true)
     try {
-      const res = await get(`${GET_COMPLAINT_BY_NO}/${encodeURIComponent(value)}`)
+      const res = await get(`${GET_COMPLAINT_BY_NO}?complaintNo=${encodeURIComponent(value)}`)
       const complaint = res.data
 
       if (complaint) {
@@ -268,10 +261,10 @@ function ReplacementPage() {
     ) : null
 
   return (
-    <div className="replacement-page bg-[#F3F4F6] min-h-screen p-6 max-sm:p-4 pb-24 max-sm:pb-20 text-[#374151] font-sans flex flex-col">
+    <div className="replacement-page bg-[#F1F3FC] min-h-[calc(100vh-72px)] p-6 max-sm:p-4 pb-24 max-sm:pb-20 text-[#374151] font-sans flex flex-col">
       <div className="mx-auto w-full max-w-[1400px] flex flex-col gap-6 flex-1">
-        <div className="flex items-start justify-between mt-2">
-          <h1 className="text-[20px] font-semibold text-[#111827] m-0 mt-2">Replacement Form</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-[22px] font-bold text-[#111827] m-0">Replacement Form</h1>
 
           <div className="flex items-start gap-3">
             <div className="flex flex-col items-center text-center bg-white border border-gray-200 rounded-[6px] px-4 py-2 min-w-[140px] shadow-sm h-[60px] justify-center">
@@ -279,18 +272,9 @@ function ReplacementPage() {
               <span className="text-[13px] font-semibold text-gray-800">{formDate.format('DD MMM YYYY')}</span>
             </div>
 
-            <div className="flex flex-col gap-1 w-[180px]">
-              <div className={`flex flex-col items-center text-center bg-white border rounded-[6px] px-4 py-2 w-full shadow-sm h-[60px] justify-center ${errors.typeOfForm ? 'border-red-400' : 'border-gray-200'}`}>
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex gap-1 justify-center w-full">TYPE OF FORM <span className="text-red-500">*</span></span>
-                <Select
-                  variant="borderless"
-                  className="w-full !p-0 [&_.ant-select-selector]:!p-0 [&_.ant-select-selector]:!min-h-0 [&_.ant-select-selection-item]:!p-0 [&_.ant-select-selection-item]:!font-semibold [&_.ant-select-selection-item]:!text-gray-800 [&_.ant-select-selection-item]:!text-[13px] [&_.ant-select-selection-item]:!leading-tight [&_.ant-select-selection-item]:text-center"
-                  options={typeOfFormOptions}
-                  value={typeOfForm}
-                  onChange={setTypeOfForm}
-                />
-              </div>
-              {errors.typeOfForm && <span className="text-[11px] text-red-500 text-center leading-tight">{errors.typeOfForm}</span>}
+            <div className="flex flex-col items-center text-center bg-white border border-gray-200 rounded-[6px] px-4 py-2 min-w-[140px] shadow-sm h-[60px] justify-center">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TYPE OF FORM</span>
+              <span className="text-[13px] font-semibold text-gray-800">Replacement</span>
             </div>
 
             <div className="flex flex-col gap-1 min-w-[180px] max-w-[280px]">

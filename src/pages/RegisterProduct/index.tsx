@@ -234,8 +234,15 @@ export default function RegisterProduct() {
             <Input size="large" placeholder="E.g. Sunrise Solar Solutions" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
-          <Form.Item label={<Text strong>Seller Phone Number</Text>} name="sellerPhone" rules={[{ required: true, message: 'Please enter phone number' }]}>
-            <Input size="large" placeholder="+91 XXXXX XXXXX" style={{ borderRadius: '8px' }} />
+          <Form.Item 
+            label={<Text strong>Seller Phone Number</Text>} 
+            name="sellerPhone" 
+            rules={[
+              { required: true, message: 'Please enter phone number' },
+              { pattern: /^\d{10}$/, message: 'Please enter exactly 10 digits' }
+            ]}
+          >
+            <Input size="large" maxLength={10} placeholder="XXXXX XXXXX" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
           <Form.Item

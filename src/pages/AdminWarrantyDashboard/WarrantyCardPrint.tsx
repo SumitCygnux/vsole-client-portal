@@ -11,9 +11,10 @@ interface Props {
   autoDownload?: boolean;
   onDownloaded?: () => void;
   onBlobGenerated?: (blob: Blob) => void;
+  isEmbedded?: boolean;
 }
 
-const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGenerated }: Props) => {
+const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGenerated, isEmbedded }: Props) => {
   const params = useParams<{ id: string }>()
   const location = useLocation()
   const queryParams = new URLSearchParams(location.search)
@@ -65,9 +66,9 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
         const opt: any = {
           margin: 0,
           filename: `Warranty_Card_${request.serial_number || 'download'}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: [210, 296], orientation: 'portrait' }
+          image: { type: 'jpeg', quality: 1 },
+          html2canvas: { scale: 4, useCORS: true, letterRendering: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
         };
 
         if (onBlobGeneratedRef.current) {
@@ -108,7 +109,7 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
     )
   }
 
-  const productName = request.product_name || ''
+  const productName = request.model || request.product_name || 'N/A'
   const warrantyDate = request.warranty_start_date ? dayjs(request.warranty_start_date).format('DD-MM-YYYY') : dayjs(request.created_at).format('DD-MM-YYYY')
   const warrantyEndDate = request.warranty_end_date ? dayjs(request.warranty_end_date).format('DD-MM-YYYY') : 'N/A'
   const clientName = request.customer_name || 'N/A'
@@ -116,7 +117,7 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
   const serialNumber = request.serial_number || ''
 
   return (
-    <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ backgroundColor: isEmbedded ? 'transparent' : '#f0f2f5', minHeight: isEmbedded ? 'auto' : '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>
         {`
           @media print {
@@ -175,20 +176,48 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
         `}
       </style>
 
-      <div className="no-print" style={{ padding: '16px 24px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>Back</Button>
-          <h3 style={{ margin: 0 }}>Warranty Card Preview</h3>
+      {!isEmbedded && (
+        <div className="no-print" style={{ padding: '16px 24px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1)
+              } else {
+                window.close()
+              }
+            }}>Back</Button>
+            <h3 style={{ margin: 0 }}>Warranty Card Preview</h3>
+          </div>
+          <Button 
+            type="primary" 
+            onClick={() => {
+              if (printRef.current && !isGenerating.current) {
+                isGenerating.current = true;
+                const opt: any = {
+                  margin: 0,
+                  filename: `Warranty_Card_${request?.serial_number || 'download'}.pdf`,
+                  image: { type: 'jpeg', quality: 1 },
+                  html2canvas: { scale: 4, useCORS: true, letterRendering: true },
+                  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
+                };
+                html2pdf().set(opt).from(printRef.current).save().then(() => {
+                  isGenerating.current = false;
+                });
+              }
+            }}
+          >
+            Download PDF
+          </Button>
         </div>
-      </div>
+      )}
 
-      <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f0f2f5' }} className="no-print-padding">
-        <div ref={printRef} style={{ display: 'flex', flexDirection: 'column', width: '210mm', height: '888mm', overflow: 'hidden', backgroundColor: 'white' }}>
+      <div style={{ flex: 1, padding: isEmbedded ? '0' : '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: isEmbedded ? 'transparent' : '#f0f2f5' }} className="no-print-padding">
+        <div ref={printRef} style={{ display: 'flex', flexDirection: 'column', width: '210mm', height: '891mm', overflow: 'hidden', backgroundColor: 'white' }}>
           <div
             className="printable-area"
             style={{
               width: '210mm',
-              height: '296mm',
+              height: '297mm',
               backgroundColor: 'white',
               position: 'relative',
               boxSizing: 'border-box'
@@ -263,29 +292,29 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
               </p>
 
               <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px' }}>Model No :</span>
-                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '2px', marginRight: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px', paddingBottom: '5px' }}>Model No :</span>
+                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '5px', marginRight: '20px' }}>
                     {productName}
                   </span>
-                  <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '10px' }}>Date :</span>
-                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', width: '85px', paddingBottom: '2px', marginRight: '20px', textAlign: 'center' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '10px', paddingBottom: '5px' }}>Date :</span>
+                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', width: '85px', paddingBottom: '5px', marginRight: '20px', textAlign: 'center' }}>
                     {warrantyDate}
                   </span>
-                  <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '10px' }}>Warranty Expiry :</span>
-                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', width: '85px', paddingBottom: '2px', textAlign: 'center' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '10px', paddingBottom: '5px' }}>Warranty Expiry :</span>
+                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', width: '85px', paddingBottom: '5px', textAlign: 'center' }}>
                     {warrantyEndDate}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px' }}>Client Name :</span>
-                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px', paddingBottom: '5px' }}>Client Name :</span>
+                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '5px' }}>
                     {clientName}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px' }}>Address :</span>
-                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '2px', minHeight: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px', paddingBottom: '5px' }}>Address :</span>
+                  <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '5px', minHeight: '20px' }}>
                     {address}
                   </span>
                 </div>
@@ -345,7 +374,7 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
             <div style={{ padding: '40px 50px', flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 {/* Left Side - Table */}
-                <div style={{ width: '45%' }}>
+                <div style={{ width: '50%' }}>
                   <div style={{ border: '2px solid black', borderRadius: '6px', overflow: 'hidden', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#d9dadaff', padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '2px solid black' }}>
                       <img src="/logo-black.png" alt="VSOLE SOLAR" style={{ height: '48px', mixBlendMode: 'multiply' }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML += '<h2 style="margin:0;">VSOLE SOLAR</h2>' }} />
@@ -353,73 +382,73 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
                     <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '11.5px', fontFamily: 'Arial, sans-serif', backgroundColor: '#d9dadaff', color: 'black' }}>
                       <tbody>
                         <tr>
-                          <td colSpan={2} style={{ border: '1px solid black', padding: '4px', fontWeight: 'bold' }}>Product : Grid Tie Inverter/ 1Phs/ V3</td>
+                          <td colSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>Product : Grid Tie Inverter/ 1Phs/ V3</td>
                         </tr>
                         <tr>
-                          <td rowSpan={2} style={{ border: '1px solid black', padding: '4px', fontWeight: 'bold', width: '45%' }}>Model No.</td>
-                          <td style={{ border: '1px solid black', padding: '4px', fontWeight: 'bold' }}>1.0 KW</td>
+                          <td rowSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold', width: '45%' }}>Model No.</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>1.0 KW</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>VS-101S</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>VS-101S</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Max. DC Power</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>1.1 kW</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. DC Power</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1.1 kW</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Max. PV Current</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>20 A X 1</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. PV Current</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>20 A X 1</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>PV Short Circuit Current</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>30 A X 1</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>PV Short Circuit Current</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>30 A X 1</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Total String</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>1</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Total String</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Max. DC Voltage</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>550V</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. DC Voltage</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>550V</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>MPPT Range</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>70-550V</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>MPPT Range</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>70-550V</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Max. Output Power</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>1.0 kW</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. Output Power</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1.0 kW</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Max. Output Current</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>4.83 A</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. Output Current</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>4.83 A</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Vac/Fac</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>230 Vac/50 Hz</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Vac/Fac</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>230 Vac/50 Hz</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Power Factor</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>+/-(0.8%)</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Power Factor</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>+/-(0.8%)</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Ambient Temp.</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>-25°C~+65°C</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Ambient Temp.</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>-25°C~+65°C</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>IP Standard</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>IP 65</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IP Standard</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IP 65</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Standard</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>IEC60068/IEC61683<br />IEC62116/IEC61727</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Standard</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IEC60068/IEC61683<br />IEC62116/IEC61727</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>Mfg. Month/Year</td>
-                          <td style={{ border: '1px solid black', padding: '4px' }}>-</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Mfg. Month/Year</td>
+                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>-</td>
                         </tr>
                         <tr>
-                          <td colSpan={2} style={{ border: '1px solid black', padding: '4px', textAlign: 'center', fontWeight: 'bold' }}>TOLL FREE - 1800 120 9697</td>
+                          <td colSpan={2} style={{ border: '1px solid black', padding: '10px 4px 6px 4px', textAlign: 'center', fontWeight: 'bold' }}>TOLL FREE - 1800 120 9697</td>
                         </tr>
                       </tbody>
                     </table>
@@ -427,12 +456,12 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
                 </div>
 
                 {/* Right Side - Serial and Warranty Badge */}
-                <div style={{ width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                  <div style={{ backgroundColor: '#d9dadaff', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '28px', marginBottom: '100px', width: '320px', height: '140px', color: 'black', borderRadius: '6px' }}>
+                <div style={{ width: '45%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <div style={{ backgroundColor: '#d9dadaff', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '28px', marginBottom: '180px', width: '100%', maxWidth: '260px', height: '60px', color: 'black', borderRadius: '6px' }}>
                     {serialNumber}
                   </div>
 
-                  <div style={{ marginRight: '60px', position: 'relative', width: '220px', height: '220px' }}>
+                  <div style={{ marginRight: '60px', position: 'relative', width: '200x', height: '200px', minWidth: '150px', minHeight: '150px', flexShrink: 0 }}>
                     {/* The circular text image around the logo */}
                     <img src="/warranty-badge.png" alt="10 Years Warranty" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => {
                       e.currentTarget.style.display = 'none';

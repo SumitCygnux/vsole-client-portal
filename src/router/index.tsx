@@ -3,7 +3,7 @@ import { ROUTES } from '@/constants/app'
 import { useAppSelector } from '@/hooks/useAppSelector'
 import ProtectedRoute from './ProtectedRoute'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-
+import HeaderOnlyLayout from '@/components/layout/HeaderOnlyLayout'
 
 import CustomerDashboard from '@/pages/CustomerDashboard'
 import RegisterProduct from '@/pages/RegisterProduct'
@@ -22,16 +22,6 @@ import AdminReplacementDashboard from '@/pages/AdminReplacementDashboard'
 import AdminReplacementDashboardDetails from '@/pages/AdminReplacementDashboard/Details'
 import MyReplacementRequestsPage from '@/pages/MyReplacementRequestsPage'
 
-
-const ConditionalDashboardLayout = () => {
-  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated)
-  const hasToken = !!localStorage.getItem('authToken')
-
-  if (isAuthenticated && hasToken) {
-    return <DashboardLayout />
-  }
-  return <Outlet />
-}
 
 const AdminRoute = () => {
   const userRole = useAppSelector((state) => state.auth.user?.role) || localStorage.getItem('customerRole') || 'customer'
@@ -52,7 +42,7 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
-    element: <ConditionalDashboardLayout />,
+    element: <HeaderOnlyLayout />,
     children: [
       { path: ROUTES.REPLACEMENT, element: <ReplacementPage /> },
     ],
