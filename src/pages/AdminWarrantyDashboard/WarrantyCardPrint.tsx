@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { get } from '@/helpers/api_helper'
 import { message, Spin, Button } from 'antd'
@@ -19,6 +19,133 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
   const location = useLocation()
   const queryParams = new URLSearchParams(location.search)
   const isAutoDownload = autoDownload || queryParams.get('autoDownload') === 'true'
+
+  const getFields = (type = '') => {
+    const baseFields = [
+      { name: 'model_no', label: 'Model No.' }
+    ];
+    const commonEndingFields = [
+      { name: 'mfg_month_year', label: 'MFG Month/Year' }
+    ];
+
+    const t = type.toLowerCase();
+
+    if (t.includes('battery') || t.includes('rechargeable li-ion')) {
+      return [
+        ...baseFields,
+        { name: 'battery_chemistry', label: 'Battery Chemistry' },
+        { name: 'operating_vdc', label: 'Operating (Vdc)' },
+        { name: 'ac_input_rating', label: 'AC Input Rating (VAC/A)' },
+        { name: 'nominal_capacity', label: 'Nominal Capacity (Ah)' },
+        { name: 'nominal_charge_discharge_current', label: 'Nominal Charge/Discharge Current (A)' },
+        { name: 'operating_temperature_charge', label: 'Operating Temperature(Charge)' },
+        { name: 'operating_temperature_discharge', label: 'Operating Temperature(Discharge)' },
+        { name: 'storage_temperature', label: 'Storage Temperature (°C)' },
+        { name: 'ip_standard', label: 'Ingress Protection' },
+        ...commonEndingFields
+      ];
+    } else if (t.includes('all in one') || t.includes('all-in-one')) {
+      return [
+        ...baseFields,
+        { name: 'battery_chemistry', label: 'Battery Chemistry' },
+        { name: 'max_pv_current', label: 'Max. PV Current (A)' },
+        { name: 'pv_short_circuit_current', label: 'PV Short Circuit Current' },
+        { name: 'total_string', label: 'Total String' },
+        { name: 'nominal_battery_voltage', label: 'Nominal Battery Voltage' },
+        { name: 'nominal_capacity_energy', label: 'Nominal Capacity/Energy' },
+        { name: 'charge_discharge_current', label: 'Charge/Discharge Current' },
+        { name: 'start_up_pv_voltage', label: 'Start Up PV Voltage (V)' },
+        { name: 'mppt_range', label: 'MPPT Voltage Range (V)' },
+        { name: 'vac_fac', label: 'Vac/Fac' },
+        { name: 'power_factor', label: 'Power Factor' },
+        { name: 'ambient_temp', label: 'Ambient Temp.' },
+        { name: 'ip_standard', label: 'IP Standard' },
+        { name: 'islanding', label: 'Islanding' },
+        ...commonEndingFields
+      ];
+    } else if (t.includes('hybrid')) {
+      return [
+        ...baseFields,
+        { name: 'max_dc_input_power', label: 'Max. DC Input Power (W)' },
+        { name: 'max_pv_current', label: 'Max. PV Current (A)' },
+        { name: 'pv_short_circuit_current', label: 'PV Short Circuit Current' },
+        { name: 'total_string', label: 'Total String' },
+        { name: 'start_up_voltage', label: 'Start-Up Voltage (V)' },
+        { name: 'mppt_range', label: 'MPPT Voltage Range (V)' },
+        { name: 'max_output_current', label: 'Max. AC Output Current' },
+        { name: 'vac_fac', label: 'Vac/Fac' },
+        { name: 'power_factor', label: 'Power Factor' },
+        { name: 'ambient_temp', label: 'Ambient Temp.' },
+        { name: 'ip_standard', label: 'IP Standard' },
+        { name: 'islanding', label: 'Islanding' },
+        ...commonEndingFields
+      ];
+    } else if (t.includes('micro')) {
+      return [
+        ...baseFields,
+        { name: 'max_pv_current', label: 'Max. PV Current' },
+        { name: 'pv_short_circuit_current', label: 'PV Short Circuit Current' },
+        { name: 'total_string', label: 'Total String' },
+        { name: 'start_up_voltage', label: 'Start-up Voltage (V)' },
+        { name: 'mppt_range', label: 'MPPT Voltage Range (V)' },
+        { name: 'vac_fac', label: 'Vac/Fac' },
+        { name: 'power_factor', label: 'Power Factor' },
+        { name: 'ambient_temp', label: 'Ambient Temp.' },
+        { name: 'ip_standard', label: 'IP Standard' },
+        { name: 'islanding', label: 'Islanding' },
+        ...commonEndingFields
+      ];
+    } else if (t.includes('grid')) {
+      return [
+        ...baseFields,
+        { name: 'max_dc_power', label: 'Max. DC Power (kW)' },
+        { name: 'max_pv_current', label: 'Max. PV Current (A)' },
+        { name: 'pv_short_circuit_current', label: 'PV Short Circuit Current' },
+        { name: 'total_string', label: 'Total String' },
+        { name: 'max_dc_voltage', label: 'Max. DC I/P Voltage' },
+        { name: 'mppt_range', label: 'MPPT Voltage Range (V)' },
+        { name: 'max_output_power', label: 'Max. Output Power' },
+        { name: 'max_output_current', label: 'Max. Output Current' },
+        { name: 'vac_fac', label: 'Vac/Fac' },
+        { name: 'power_factor', label: 'Power Factor' },
+        { name: 'ambient_temp', label: 'Ambient Temp.' },
+        { name: 'ip_standard', label: 'IP Standard' },
+        { name: 'standard', label: 'Standard' },
+        ...commonEndingFields
+      ];
+    } else if (t.includes('bms')) {
+      return [
+        ...baseFields,
+        { name: 'operating_vdc', label: 'Operating (Vdc)' },
+        { name: 'ac_input_rating', label: 'AC Input Rating (VAC/A)' },
+        { name: 'nominal_capacity', label: 'Nominal Capacity (Ah)' },
+        { name: 'nominal_charge_discharge_current', label: 'Nominal Charge/Discharge Current (A)' },
+        { name: 'operating_temperature_charge', label: 'Operating Temperature(Charge)' },
+        { name: 'operating_temperature_discharge', label: 'Operating Temperature(Discharge)' },
+        { name: 'storage_temperature', label: 'Storage Temperature (°C)' },
+        { name: 'ip_standard', label: 'Ingress Protection' },
+        ...commonEndingFields
+      ];
+    }
+
+    return [
+      ...baseFields,
+      { name: 'max_dc_power', label: 'Max DC Power' },
+      { name: 'max_pv_current', label: 'Max PV Current' },
+      { name: 'pv_short_circuit_current', label: 'PV Short Circuit Current' },
+      { name: 'total_string', label: 'Total String' },
+      { name: 'max_dc_voltage', label: 'Max DC Voltage' },
+      { name: 'mppt_range', label: 'MPPT Range' },
+      { name: 'max_output_power', label: 'Max Output Power' },
+      { name: 'max_output_current', label: 'Max Output Current' },
+      { name: 'vac_fac', label: 'Vac/Fac' },
+      { name: 'power_factor', label: 'Power Factor' },
+      { name: 'ambient_temp', label: 'Ambient Temp.' },
+      { name: 'ip_standard', label: 'IP Standard' },
+      { name: 'standard', label: 'Standard' },
+      { name: 'mfg_month_year', label: 'MFG Month/Year' }
+    ];
+  };
 
   const id = propId || params.id
   const navigate = useNavigate()
@@ -109,7 +236,8 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
     )
   }
 
-  const productName = request.model || request.product_name || 'N/A'
+  const rawProductName = request?.product_name || request?.model || request?.technical_data?.model_no || 'N/A'
+  const productName = rawProductName !== 'N/A' ? rawProductName.replace(/\s*\([^)]*\)\s*$/, '') : 'N/A'
   const warrantyDate = request.warranty_start_date ? dayjs(request.warranty_start_date).format('DD-MM-YYYY') : dayjs(request.created_at).format('DD-MM-YYYY')
   const warrantyEndDate = request.warranty_end_date ? dayjs(request.warranty_end_date).format('DD-MM-YYYY') : 'N/A'
   const clientName = request.customer_name || 'N/A'
@@ -188,8 +316,8 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
             }}>Back</Button>
             <h3 style={{ margin: 0 }}>Warranty Card Preview</h3>
           </div>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             onClick={() => {
               if (printRef.current && !isGenerating.current) {
                 isGenerating.current = true;
@@ -293,7 +421,7 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
 
               <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px', paddingBottom: '5px' }}>Model No :</span>
+                  <span style={{ fontWeight: 'bold', width: '100px', fontSize: '14px', paddingBottom: '5px' }}>Product :</span>
                   <span style={{ fontSize: '14px', borderBottom: '1px solid #000', flex: 1, paddingBottom: '5px', marginRight: '20px' }}>
                     {productName}
                   </span>
@@ -322,7 +450,7 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
 
               <div style={{ position: 'absolute', bottom: '40px', left: '50px', right: '50px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                  <div style={{ width: '100px', height: '100px', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ width: '120px', height: '110px', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <img
                       src="/logo.png"
                       alt="VSOLE Logo"
@@ -382,71 +510,33 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
                     <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '11.5px', fontFamily: 'Arial, sans-serif', backgroundColor: '#d9dadaff', color: 'black' }}>
                       <tbody>
                         <tr>
-                          <td colSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>Product : Grid Tie Inverter/ 1Phs/ V3</td>
+                          <td colSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>Product : {request?.product_name || request?.model || request?.product_type || 'Grid Tie Inverter/ 1Phs/ V3'}</td>
                         </tr>
-                        <tr>
-                          <td rowSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold', width: '45%' }}>Model No.</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>1.0 KW</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>VS-101S</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. DC Power</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1.1 kW</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. PV Current</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>20 A X 1</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>PV Short Circuit Current</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>30 A X 1</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Total String</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. DC Voltage</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>550V</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>MPPT Range</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>70-550V</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. Output Power</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>1.0 kW</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Max. Output Current</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>4.83 A</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Vac/Fac</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>230 Vac/50 Hz</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Power Factor</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>+/-(0.8%)</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Ambient Temp.</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>-25°C~+65°C</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IP Standard</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IP 65</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Standard</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>IEC60068/IEC61683<br />IEC62116/IEC61727</td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>Mfg. Month/Year</td>
-                          <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>-</td>
-                        </tr>
+                        {getFields(request?.product_type || '').map((field) => {
+                          if (field.name === 'model_no') {
+                            const val1 = request?.technical_data?.max_output_power || request?.technical_data?.nominal_capacity_energy || request?.technical_data?.nominal_capacity || request?.technical_data?.max_dc_input_power || '-';
+                            const val2 = request?.technical_data?.model_no || request?.model || '-';
+                            return (
+                              <React.Fragment key={field.name}>
+                                <tr>
+                                  <td rowSpan={2} style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold', width: '45%' }}>{field.label}</td>
+                                  <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', fontWeight: 'bold' }}>{val1}</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>{val2}</td>
+                                </tr>
+                              </React.Fragment>
+                            );
+                          }
+                          const val = request?.technical_data?.[field.name] || '-';
+                          const displayVal = typeof val === 'string' ? val.replace(/\\n/g, '\n') : val;
+                          return (
+                            <tr key={field.name}>
+                              <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle' }}>{field.label}</td>
+                              <td style={{ border: '1px solid black', padding: '6px 4px', verticalAlign: 'middle', whiteSpace: 'pre-line' }}>{displayVal}</td>
+                            </tr>
+                          );
+                        })}
                         <tr>
                           <td colSpan={2} style={{ border: '1px solid black', padding: '10px 4px 6px 4px', textAlign: 'center', fontWeight: 'bold' }}>TOLL FREE - 1800 120 9697</td>
                         </tr>
@@ -461,11 +551,11 @@ const WarrantyCardPrint = ({ id: propId, autoDownload, onDownloaded, onBlobGener
                     {serialNumber}
                   </div>
 
-                  <div style={{ marginRight: '60px', position: 'relative', width: '200x', height: '200px', minWidth: '150px', minHeight: '150px', flexShrink: 0 }}>
+                  <div style={{ position: 'relative', width: '220px', height: '180px', minWidth: '150px', minHeight: '150px', flexShrink: 0 }}>
                     {/* The circular text image around the logo */}
                     <img src="/warranty-badge.png" alt="10 Years Warranty" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => {
                       e.currentTarget.style.display = 'none';
-                      e.currentTarget.parentElement!.innerHTML = '<div style="width:220px; height:220px; border-radius:50%; border:2px solid #183365; display:flex; justify-content:center; align-items:center; flex-direction:column; color:#183365; text-align:center;"><div style="font-weight:bold; font-size:32px;">10*</div><div style="font-size:16px;">YEARS<br/>WARRANTY</div></div>';
+                      e.currentTarget.parentElement!.innerHTML = '<div style="width:200px; height:200px; border-radius:50%; border:2px solid #183365; display:flex; justify-content:center; align-items:center; flex-direction:column; color:#183365; text-align:center;"><div style="font-weight:bold; font-size:32px;">10*</div><div style="font-size:16px;">YEARS<br/>WARRANTY</div></div>';
                     }} />
                   </div>
                 </div>

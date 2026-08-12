@@ -60,6 +60,7 @@ const MyProductsPage: React.FC = () => {
       title: 'Product Name',
       dataIndex: 'product_name',
       key: 'product_name',
+      render: (text: string) => text ? text.replace(/\s*\([^)]*\)\s*$/, '') : 'N/A',
     },
     {
       title: 'Registration Date',

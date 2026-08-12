@@ -68,6 +68,7 @@ export const router = createBrowserRouter([
               { path: ROUTES.ADMIN_WARRANTY_REQUEST_DETAILS, element: <AdminWarrantyDashboardDetails /> },
               { path: ROUTES.ADMIN_REPLACEMENT_REQUESTS, element: <AdminReplacementDashboard /> },
               { path: ROUTES.ADMIN_REPLACEMENT_REQUEST_DETAILS, element: <AdminReplacementDashboardDetails /> },
+              { path: ROUTES.ADMIN_REPLACEMENT_FORM, element: <ReplacementPage /> },
             ],
           },
         ],

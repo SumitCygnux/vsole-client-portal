@@ -145,7 +145,7 @@ export default function RegisterProduct() {
               <Descriptions size="small" column={2} layout="vertical">
                 {productDetails.product_name && (
                   <Descriptions.Item label={<Text type="secondary">Product Name</Text>}>
-                    <Text strong>{productDetails.product_name}</Text>
+                    <Text strong>{productDetails.product_name.replace(/\s*\([^)]*\)\s*$/, '')}</Text>
                   </Descriptions.Item>
                 )}
                 {productDetails.product_type && (

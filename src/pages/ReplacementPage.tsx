@@ -4,7 +4,7 @@ import { Input, Select, message } from 'antd'
 import dayjs from 'dayjs'
 
 import { get, post } from '@/helpers/api_helper'
-import { CREATE_REPLACEMENT_DETAIL, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN } from '@/helpers/url_helper'
+import { CREATE_REPLACEMENT_DETAIL, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN, GET_COMPLAINTS } from '@/helpers/url_helper'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 
@@ -52,6 +52,52 @@ function ReplacementPage() {
   const [errors, setErrors] = useState<FormErrors>({})
 
   const [pincodes, setPincodes] = useState<any[]>([])
+  const [complaintOptions, setComplaintOptions] = useState<{label: string, value: string}[]>([])
+  const [fetchingComplaints, setFetchingComplaints] = useState(false)
+
+  const [complaintPage, setComplaintPage] = useState(1)
+  const [hasMoreComplaints, setHasMoreComplaints] = useState(true)
+  const [complaintSearchTerm, setComplaintSearchTerm] = useState('')
+
+  const fetchComplaints = useCallback(async (search = '', page = 1, append = false) => {
+    setFetchingComplaints(true)
+    try {
+      const res = await get(`${GET_COMPLAINTS}?limit=10&page=${page}&search=${encodeURIComponent(search)}`)
+      if (res.success && res.data) {
+        const newOptions = res.data.map((c: any) => ({
+          label: c.complaint_no,
+          value: c.complaint_no
+        }))
+        setComplaintOptions(prev => append ? [...prev, ...newOptions] : newOptions)
+        setHasMoreComplaints(page < (res.pagination?.totalPages || 1))
+        setComplaintPage(page)
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setFetchingComplaints(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (localStorage.getItem('authToken')) {
+      fetchComplaints('', 1, false)
+    }
+  }, [fetchComplaints])
+
+  const handlePopupScroll = (e: any) => {
+    const { target } = e;
+    if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 20) {
+      if (hasMoreComplaints && !fetchingComplaints) {
+        fetchComplaints(complaintSearchTerm, complaintPage + 1, true)
+      }
+    }
+  }
+
+  const handleDropdownSearch = (val: string) => {
+    setComplaintSearchTerm(val)
+    fetchComplaints(val, 1, false)
+  }
 
   useEffect(() => {
     const fetchPincodes = async () => {
@@ -100,7 +146,11 @@ function ReplacementPage() {
   const verifyComplaint = async (value: string) => {
     setVerifying(true)
     try {
-      const res = await get(`${GET_COMPLAINT_BY_NO}?complaintNo=${encodeURIComponent(value)}`)
+      const token = localStorage.getItem('authToken')
+      const url = token 
+        ? `${GET_COMPLAINT_BY_NO}?complaintNo=${encodeURIComponent(value)}`
+        : `${GET_COMPLAINT_BY_NO}/${encodeURIComponent(value)}`
+      const res = await get(url)
       const complaint = res.data
 
       if (complaint) {
@@ -280,14 +330,38 @@ function ReplacementPage() {
             <div className="flex flex-col gap-1 min-w-[180px] max-w-[280px]">
               <div className={`flex flex-col items-center text-center bg-white border rounded-[6px] px-4 py-2 w-full shadow-sm h-[60px] justify-center ${errors.complaintNo || complaintError ? 'border-red-400' : 'border-gray-200'}`}>
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex gap-1 justify-center w-full">COMPLAINT NO <span className="text-red-500">*</span></span>
-                <Input
-                  variant="borderless"
-                  className="!p-0 !font-semibold text-gray-800 text-[13px] placeholder:font-normal placeholder:text-gray-400 !bg-transparent h-auto leading-tight text-center disabled:!text-gray-800 disabled:!opacity-100 [&_input]:disabled:!text-gray-800"
-                  placeholder="Enter complaint number"
-                  value={complaintSearch}
-                  onChange={(e) => handleComplaintVerify(e.target.value)}
-                  disabled={verifying || !!complaintQuery}
-                />
+                {localStorage.getItem('authToken') ? (
+                  <Select
+                    showSearch
+                    variant="borderless"
+                    className="w-full text-center [&_.ant-select-selector]:!p-0 [&_.ant-select-selection-item]:!font-semibold [&_.ant-select-selection-item]:!text-gray-800 [&_.ant-select-selection-item]:!text-[13px] [&_.ant-select-selection-search-input]:!text-center [&_.ant-select-arrow]:!hidden"
+                    placeholder="Select complaint"
+                    value={complaintSearch || undefined}
+                    onChange={(val) => handleComplaintVerify(val)}
+                    onSearch={(val) => {
+                      handleComplaintVerify(val)
+                      handleDropdownSearch(val)
+                    }}
+                    onPopupScroll={handlePopupScroll}
+                    suffixIcon={null}
+                    showArrow={false}
+                    listHeight={250}
+                    dropdownClassName="[&_.ant-select-item]:!text-center"
+                    filterOption={false}
+                    options={complaintOptions}
+                    loading={fetchingComplaints}
+                    disabled={verifying || !!complaintQuery}
+                  />
+                ) : (
+                  <Input
+                    variant="borderless"
+                    className="!p-0 !font-semibold text-gray-800 text-[13px] placeholder:font-normal placeholder:text-gray-400 !bg-transparent h-auto leading-tight text-center disabled:!text-gray-800 disabled:!opacity-100 [&_input]:disabled:!text-gray-800"
+                    placeholder="Enter complaint number"
+                    value={complaintSearch}
+                    onChange={(e) => handleComplaintVerify(e.target.value)}
+                    disabled={verifying || !!complaintQuery}
+                  />
+                )}
               </div>
               {(errors.complaintNo || complaintError) && (
                 <span className="text-[11px] text-red-500 text-center leading-tight mt-0.5">

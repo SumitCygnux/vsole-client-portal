@@ -73,9 +73,14 @@ export default function AdminReplacementDashboard() {
       key: 'complaint_number',
     },
     {
-      title: 'EPC Name',
-      dataIndex: 'epc_name',
-      key: 'epc_name',
+      title: 'Customer Name',
+      dataIndex: 'customer_name',
+      key: 'customer_name',
+    },
+    {
+      title: 'Created By',
+      dataIndex: 'created_by_name',
+      key: 'created_by_name',
     },
     {
       title: 'Status',

@@ -20,10 +20,10 @@ const menuItems: MenuItem[] = [
   { icon: PlusCircle, key: ROUTES.REGISTER_PRODUCT, label: 'Register Product', roles: ['customer'] },
   { icon: List, key: ROUTES.MY_PRODUCTS, label: 'My Products', roles: ['customer'] },
   { icon: Shield, key: ROUTES.WARRANTY_STATUS, label: 'Warranty Status', roles: ['customer'] },
-  // { icon: FileText, key: ROUTES.REPLACEMENT, label: 'Replacement Form', roles: ['customer'] },
+  { icon: FileText, key: ROUTES.ADMIN_REPLACEMENT_FORM, label: 'Replacement Form', roles: ['admin'] },
   // { icon: List, key: ROUTES.MY_REPLACEMENTS, label: 'My Replacements', roles: ['customer'] },
   { icon: Settings, key: ROUTES.ADMIN_WARRANTY_REQUESTS, label: 'Warranty Dashboard', roles: ['admin'] },
-  { icon: FileText, key: ROUTES.ADMIN_REPLACEMENT_REQUESTS, label: 'Replacement Forms', roles: ['admin'] },
+  { icon: FileText, key: ROUTES.ADMIN_REPLACEMENT_REQUESTS, label: 'Replacement Dashboard', roles: ['admin'] },
   { icon: UserRound, key: ROUTES.PROFILE, label: 'Profile', roles: ['customer', 'admin'] },
 ]
 

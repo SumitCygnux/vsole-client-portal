@@ -13,5 +13,6 @@ export const ROUTES = {
   WARRANTY_CARD_PRINT: '/warranty-card/:id/print',
   ADMIN_REPLACEMENT_REQUESTS: '/admin/replacement-requests',
   ADMIN_REPLACEMENT_REQUEST_DETAILS: '/admin/replacement-requests/:id',
+  ADMIN_REPLACEMENT_FORM: '/admin/replacement-form',
   MY_REPLACEMENTS: '/my-replacements',
 } as const
