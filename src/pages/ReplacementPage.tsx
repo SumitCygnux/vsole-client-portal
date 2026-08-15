@@ -52,7 +52,7 @@ function ReplacementPage() {
   const [errors, setErrors] = useState<FormErrors>({})
 
   const [pincodes, setPincodes] = useState<any[]>([])
-  const [complaintOptions, setComplaintOptions] = useState<{label: string, value: string}[]>([])
+  const [complaintOptions, setComplaintOptions] = useState<{ label: string, value: string }[]>([])
   const [fetchingComplaints, setFetchingComplaints] = useState(false)
 
   const [complaintPage, setComplaintPage] = useState(1)
@@ -125,6 +125,10 @@ function ReplacementPage() {
     return ''
   }, [pincode, pincodes])
 
+  const pincodeOptions = useMemo(() => {
+    return pincodes.map(p => ({ value: p.pinCode || p.pin_name, label: String(p.pinCode || p.pin_name) }))
+  }, [pincodes])
+
 
 
 
@@ -147,7 +151,7 @@ function ReplacementPage() {
     setVerifying(true)
     try {
       const token = localStorage.getItem('authToken')
-      const url = token 
+      const url = token
         ? `${GET_COMPLAINT_BY_NO}?complaintNo=${encodeURIComponent(value)}`
         : `${GET_COMPLAINT_BY_NO}/${encodeURIComponent(value)}`
       const res = await get(url)
@@ -485,13 +489,8 @@ function ReplacementPage() {
                     return digits
                   }}
                   status={errors.pincode ? 'error' : undefined}
-                >
-                  {pincodes.map((p) => (
-                    <Select.Option key={p.id} value={p.pinCode || p.pin_name}>
-                      {p.pinCode || p.pin_name}
-                    </Select.Option>
-                  ))}
-                </Select>
+                  options={pincodeOptions}
+                />
                 {fieldError('pincode')}
               </div>
               <ReadOnlyField label="State" value={state || ''} />
