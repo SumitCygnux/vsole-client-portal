@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Typography, Table, Tag, Button, message } from 'antd'
-import { EyeOutlined } from '@ant-design/icons'
+import { EyeOutlined, FilePdfOutlined } from '@ant-design/icons'
 import { get } from '@/helpers/api_helper'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
@@ -87,14 +87,26 @@ export default function AdminWarrantyDashboard() {
       title: 'Action',
       key: 'action',
       render: (_: any, record: any) => (
-        <Button
-          type="primary"
-          icon={<EyeOutlined />}
-          size="small"
-          onClick={() => handleView(record)}
-        >
-          View
-        </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button
+            type="primary"
+            icon={<EyeOutlined />}
+            size="small"
+            onClick={() => handleView(record)}
+          >
+            View
+          </Button>
+          {record.status === 'Approved' && (
+            <Button
+              type="default"
+              icon={<FilePdfOutlined />}
+              size="small"
+              onClick={() => window.open(ROUTES.WARRANTY_CARD_PRINT.replace(':id', record.id), '_blank')}
+            >
+              Card
+            </Button>
+          )}
+        </div>
       ),
     },
   ]

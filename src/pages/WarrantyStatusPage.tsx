@@ -108,7 +108,7 @@ export default function WarrantyStatusPage() {
               <Text strong>{warrantyDetails.serial_number}</Text>
             </Descriptions.Item>
             <Descriptions.Item label={<span><AppstoreOutlined /> Product Name</span>}>
-              {warrantyDetails.product_name || 'N/A'}
+              {warrantyDetails.product_name ? warrantyDetails.product_name.replace(/\s*\([^)]*\)\s*$/, '') : 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label={<span><CalendarOutlined /> Purchase Date</span>}>
               {warrantyDetails.purchase_date ? dayjs(warrantyDetails.purchase_date).format('DD MMM YYYY') : 'N/A'}

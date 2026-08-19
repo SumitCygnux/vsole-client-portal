@@ -1,6 +1,6 @@
 import { Col, Form, Input, Row, Typography, message, Button } from 'antd'
 import { useState, useEffect } from 'react'
-import { ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined, FormOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation, type Location } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
 import { useAppDispatch } from '@/hooks/useAppDispatch'
@@ -48,14 +48,24 @@ function LoginPage() {
           <Text style={{ display: 'block', marginBottom: '20px', color: '#6b7280' }}>
             It looks like you're already authenticated as {localStorage.getItem('customerEmail') || 'a customer'}.
           </Text>
-          <button
-            onClick={() => navigate(ROUTES.DASHBOARD)}
-            style={{
-              padding: '12px 24px', backgroundColor: '#283046', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600
-            }}
-          >
-            Go to Dashboard
-          </button>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate(ROUTES.DASHBOARD)}
+              style={{
+                padding: '12px 24px', backgroundColor: '#283046', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600
+              }}
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => navigate(ROUTES.REPLACEMENT)}
+              style={{
+                padding: '12px 24px', backgroundColor: '#F0F5FF', color: '#0B63CE', border: '1px solid #ADC6FF', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
+              }}
+            >
+              Replacement Form
+            </button>
+          </div>
         </div>
       </main>
     )
@@ -406,10 +416,35 @@ function LoginPage() {
                   </div>
                 )}
 
-                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                   <Text style={{ fontSize: '14px', color: '#6b7280' }}>
                     Don't have an account? <Link href={ROUTES.REGISTER} style={{ color: '#3b82f6', fontWeight: 600 }}>Create Account</Link>
                   </Text>
+                </div>
+
+                <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(ROUTES.REPLACEMENT)}
+                    style={{
+                      width: '100%',
+                      padding: '11px 16px',
+                      backgroundColor: '#F0F5FF',
+                      color: '#0B63CE',
+                      border: '1px solid #ADC6FF',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <FormOutlined /> Product Replacement Request Form
+                  </button>
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
