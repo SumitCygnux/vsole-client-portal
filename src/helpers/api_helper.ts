@@ -15,6 +15,11 @@ axiosApi.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    
+    // Pass the default tenant_id for all requests
+    config.params = config.params || {};
+    config.params.tenant_id = 'eff743de-5dc4-46d9-8322-95b95604ec49';
+    
     return config;
   },
   (error) => Promise.reject(error)
