@@ -143,14 +143,20 @@ export default function AdminReplacementDashboardDetails() {
               </Col>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Type of Form</Text>
-                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.type_of_form || 'Replacement'}</Text>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Client Contact No</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.client_contact_no || 'N/A'}</Text>
                 </div>
               </Col>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>EPC Name</Text>
                   <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.epc_name || 'N/A'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>EPC GST No</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.epc_gst_no || 'N/A'}</Text>
                 </div>
               </Col>
               <Col span={24}>
@@ -180,6 +186,30 @@ export default function AdminReplacementDashboardDetails() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Dispatch Address</Text>
                   <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.dispatch_address || 'N/A'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Pincode</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>
+                    {request.pincode || '-'}
+                  </Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>City</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>
+                    {request.city || '-'}
+                  </Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>State</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>
+                    {request.state || '-'}
+                  </Text>
                 </div>
               </Col>
             </Row>

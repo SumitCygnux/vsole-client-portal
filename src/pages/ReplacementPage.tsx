@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { Input, Select, message } from 'antd'
+import { Input, Select, message, Checkbox } from 'antd'
 import dayjs from 'dayjs'
+import axios from 'axios'
 
 import { get, post } from '@/helpers/api_helper'
 import { CREATE_REPLACEMENT_DETAIL, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN, GET_COMPLAINTS } from '@/helpers/url_helper'
@@ -21,8 +22,6 @@ type Complaint = {
   location_id?: string
   fin_year?: string
 }
-
-
 
 type FormErrors = Record<string, string>
 
@@ -47,11 +46,12 @@ function ReplacementPage() {
   const [pincode, setPincode] = useState('')
   const [clientContactNo, setClientContactNo] = useState('')
   const [typeOfForm, setTypeOfForm] = useState<string>('replacement')
+  
+  const [verifyGst, setVerifyGst] = useState(false)
+  const [gstVerifyLoading, setGstVerifyLoading] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
-
-  const [pincodes, setPincodes] = useState<any[]>([])
   const [complaintOptions, setComplaintOptions] = useState<{ label: string, value: string }[]>([])
   const [fetchingComplaints, setFetchingComplaints] = useState(false)
 
@@ -111,11 +111,45 @@ function ReplacementPage() {
     fetchPincodes()
   }, [])
 
-  useEffect(() => {
-    if (complaintQuery) {
-      setComplaintSearch(complaintQuery)
+  const [pincodes, setPincodes] = useState<any[]>([])
+  const [fetchingPincodes, setFetchingPincodes] = useState(false)
+  const [pincodePage, setPincodePage] = useState(1)
+  const [hasMorePincodes, setHasMorePincodes] = useState(true)
+  const [pincodeSearchTerm, setPincodeSearchTerm] = useState('')
+
+  const fetchPincodes = useCallback(async (search = '', page = 1, append = false) => {
+    setFetchingPincodes(true)
+    try {
+      const res = await get(`${GET_PIN_DROPDOWN}?limit=50&page=${page}&search=${encodeURIComponent(search)}`)
+      if (res.status && res.data) {
+        setPincodes(prev => append ? [...prev, ...res.data] : res.data)
+        setHasMorePincodes(page < (res.pagination?.totalPages || 1))
+        setPincodePage(page)
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setFetchingPincodes(false)
     }
-  }, [complaintQuery])
+  }, [])
+
+  useEffect(() => {
+    fetchPincodes('', 1, false)
+  }, [fetchPincodes])
+
+  const handlePincodePopupScroll = (e: any) => {
+    const { target } = e;
+    if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 20) {
+      if (hasMorePincodes && !fetchingPincodes) {
+        fetchPincodes(pincodeSearchTerm, pincodePage + 1, true)
+      }
+    }
+  }
+
+  const handlePincodeSearch = (val: string) => {
+    setPincodeSearchTerm(val)
+    fetchPincodes(val, 1, false)
+  }
 
   const state = useMemo(() => {
     if (pincode.length === 6) {
@@ -125,13 +159,77 @@ function ReplacementPage() {
     return ''
   }, [pincode, pincodes])
 
+  const city = useMemo(() => {
+    if (pincode.length === 6) {
+      const p = pincodes.find((pin) => (pin.pinCode || pin.pin_name) === pincode)
+      return p ? (p.city_id?.name || p.city_id?.city_name || '') : ''
+    }
+    return ''
+  }, [pincode, pincodes])
+
   const pincodeOptions = useMemo(() => {
-    return pincodes.map(p => ({ value: p.pinCode || p.pin_name, label: String(p.pinCode || p.pin_name) }))
+    return pincodes.map(p => ({ value: String(p.pinCode || p.pin_name), label: String(p.pinCode || p.pin_name) }))
   }, [pincodes])
 
+  const autoVerifyGstIfReady = async (rawGst: string, forceVerify = false) => {
+    const gst = String(rawGst)
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, '')
+      .slice(0, 15)
+    
+    if (gst.length !== 15 || gstVerifyLoading) return
+    if (!verifyGst && !forceVerify) return
 
+    setGstVerifyLoading(true)
+    try {
+      const res = await axios.post("https://services.cygnux.in/api/gst", {
+        api_key: "f1af2edece05bbd40a8f98002286446e",
+        user_id: 17,
+        gst: gst,
+      })
+      if (res.data?.status === 1 && !res.data?.response?.error) {
+        const d = res.data?.response?.data || {}
+        const tradeNam = d?.tradeNam || ""
+        const lgnm = d?.lgnm || ""
+        const addr = d?.pradr?.addr || {}
+        const fullAddress = [
+          addr?.bnm,
+          addr?.flno,
+          addr?.bno,
+          addr?.st,
+          addr?.loc,
+          addr?.dst,
+          addr?.stcd,
+          addr?.pncd,
+        ].filter(Boolean).join(", ")
 
+        if (tradeNam || lgnm) {
+          setEpcName(tradeNam || lgnm)
+        }
+        if (fullAddress.trim()) {
+          setDispatchAddress(fullAddress.trim())
+        }
+        if (addr?.pncd) {
+          setPincode(addr.pncd)
+          handlePincodeSearch(addr.pncd)
+        }
+        message.success("GST verified and details autofilled")
+      } else {
+        const msg = res.data?.message || res.data?.response?.error || "GST verification failed"
+        message.error(msg)
+      }
+    } catch (e: any) {
+      message.error(e?.message || "GST verification failed")
+    } finally {
+      setGstVerifyLoading(false)
+    }
+  }
 
+  useEffect(() => {
+    if (complaintQuery) {
+      setComplaintSearch(complaintQuery)
+    }
+  }, [complaintQuery])
 
   const [verifying, setVerifying] = useState(false)
 
@@ -224,6 +322,7 @@ function ReplacementPage() {
     if (!dispatchAddress.trim()) newErrors.dispatchAddress = 'Dispatch address is required'
     if (!pincode.trim() || pincode.length !== 6) newErrors.pincode = 'Valid pincode is required'
     if (!state) newErrors.state = 'State is required'
+    if (!city) newErrors.city = 'City is required'
     if (!clientContactNo.trim() || clientContactNo.length !== 10) {
       newErrors.clientContactNo = 'Valid contact number is required'
     } else if (!/^[6-9][0-9]{9}$/.test(clientContactNo)) {
@@ -243,6 +342,7 @@ function ReplacementPage() {
     epcGstNo,
     dispatchAddress,
     pincode,
+    city,
     state,
     clientContactNo,
     typeOfForm,
@@ -287,6 +387,7 @@ function ReplacementPage() {
         dispatch_address: dispatchAddress,
         pincode,
         state,
+        city,
         client_contact_no: clientContactNo,
         type_of_form: typeOfForm,
         is_form_fill: true,
@@ -416,37 +517,47 @@ function ReplacementPage() {
               <ToggleField label="Capacity right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
               <ToggleField label="Serial no right?" value={serialNoRight} onChange={setSerialNoRight} error={errors.serialNoRight} />
               <FormInput label="EPC name" required value={epcName} onChange={setEpcName} error={errors.epcName} />
-              <FormInput
-                label="EPC GST no"
-                required
-                value={epcGstNo}
-                onChange={(val) => {
-                  const raw = val.toUpperCase().replace(/[^A-Z0-9]/g, '')
-                  let formatted = ''
-                  for (let i = 0; i < raw.length; i++) {
-                    const char = raw[i]
-                    if (i < 2) {
-                      if (/[0-9]/.test(char)) formatted += char
-                    } else if (i < 7) {
-                      if (/[A-Z]/.test(char)) formatted += char
-                    } else if (i < 11) {
-                      if (/[0-9]/.test(char)) formatted += char
-                    } else if (i === 11) {
-                      if (/[A-Z]/.test(char)) formatted += char
-                    } else if (i === 12) {
-                      if (/[1-9A-Z]/.test(char)) formatted += char
-                    } else if (i === 13) {
-                      if (char === 'Z') formatted += char
-                    } else if (i === 14) {
-                      if (/[A-Z0-9]/.test(char)) formatted += char
+              <div>
+                <FieldLabel label="EPC GST no" required />
+                <Input
+                  className="h-10 !rounded-lg !border-gray-300 !bg-[#F9FAFB] hover:!border-gray-400 focus:!border-[#5C6BC0] focus:!bg-white text-[13px]"
+                  required
+                  value={epcGstNo}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    const raw = val.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                    let formatted = ''
+                    for (let i = 0; i < raw.length; i++) {
+                      const char = raw[i]
+                      if (i < 2) {
+                        if (/[0-9]/.test(char)) formatted += char
+                      } else if (i < 7) {
+                        if (/[A-Z]/.test(char)) formatted += char
+                      } else if (i < 11) {
+                        if (/[0-9]/.test(char)) formatted += char
+                      } else if (i === 11) {
+                        if (/[A-Z]/.test(char)) formatted += char
+                      } else if (i === 12) {
+                        if (/[1-9A-Z]/.test(char)) formatted += char
+                      } else if (i === 13) {
+                        if (char === 'Z') formatted += char
+                      } else if (i === 14) {
+                        if (/[A-Z0-9]/.test(char)) formatted += char
+                      }
                     }
-                  }
-                  setEpcGstNo(formatted)
-                }}
-                error={errors.epcGstNo}
-                placeholder="e.g. 22AAAAA0000A1Z5"
-                maxLength={15}
-              />
+                    setEpcGstNo(formatted)
+                    if (formatted.length === 15) {
+                      autoVerifyGstIfReady(formatted)
+                    }
+                  }}
+                  status={errors.epcGstNo ? 'error' : undefined}
+                  placeholder="e.g. 22AAAAA0000A1Z5"
+                  maxLength={15}
+                  disabled={gstVerifyLoading}
+                />
+                {errors.epcGstNo && <span className="mt-1 block text-xs text-red-500">{errors.epcGstNo}</span>}
+                {gstVerifyLoading && <span className="mt-1 block text-xs text-blue-500">Verifying GST...</span>}
+              </div>
             </div>
 
             {/* Conditional inputs if toggles are false */}
@@ -463,7 +574,6 @@ function ReplacementPage() {
                 <Select
                   showSearch
                   placeholder="Pincode"
-                  optionFilterProp="children"
                   className="w-full h-10 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!bg-[#F9FAFB] hover:[&_.ant-select-selector]:!border-gray-400 [&_.ant-select-selector]:!border-gray-300 [&_.ant-select-selector]:!h-10 [&_.ant-select-selection-item]:!leading-[38px] text-[13px]"
                   value={pincode || undefined}
                   onChange={(val) => setPincode(val)}
@@ -483,17 +593,36 @@ function ReplacementPage() {
                   }}
                   onSearch={(val) => {
                     const digits = val.replace(/\D/g, '')
-                    if (digits.length > 6) {
-                      return digits.slice(0, 6)
-                    }
-                    return digits
+                    handlePincodeSearch(digits)
                   }}
+                  onPopupScroll={handlePincodePopupScroll}
+                  filterOption={false}
+                  loading={fetchingPincodes}
                   status={errors.pincode ? 'error' : undefined}
                   options={pincodeOptions}
                 />
                 {fieldError('pincode')}
               </div>
+              <ReadOnlyField label="City" value={city || ''} />
               <ReadOnlyField label="State" value={state || ''} />
+              <div>
+                <div className="block text-[12px] font-medium mb-1 h-[18px]"></div>
+                <div className="h-10 flex items-center">
+                  <Checkbox 
+                    className="text-[13px] text-gray-700 font-medium"
+                    checked={verifyGst} 
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setVerifyGst(checked)
+                      if (checked && epcGstNo.length === 15) {
+                        autoVerifyGstIfReady(epcGstNo, true)
+                      }
+                    }}
+                  >
+                    Verify GST?
+                  </Checkbox>
+                </div>
+              </div>
             </div>
 
             <div>
