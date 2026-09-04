@@ -45,6 +45,7 @@ function ReplacementPage() {
   const [dispatchAddress, setDispatchAddress] = useState('')
   const [pincode, setPincode] = useState('')
   const [pincodeId, setPincodeId] = useState<string | null>(null)
+  const [selectedPin, setSelectedPin] = useState<any>(null)
   const [clientContactNo, setClientContactNo] = useState('')
   const [typeOfForm, setTypeOfForm] = useState<string>('replacement')
   
@@ -161,20 +162,14 @@ function ReplacementPage() {
   }
 
   const state = useMemo(() => {
-    if (pincode.length === 6) {
-      const p = pincodes.find((pin) => (pin.pinCode || pin.pin_name) === pincode)
-      return p ? (p.state_id?.name || p.state_id?.state_name || '') : ''
-    }
+    if (selectedPin) return selectedPin.state_id?.name || selectedPin.state_id?.state_name || ''
     return ''
-  }, [pincode, pincodes])
+  }, [selectedPin])
 
   const city = useMemo(() => {
-    if (pincode.length === 6) {
-      const p = pincodes.find((pin) => (pin.pinCode || pin.pin_name) === pincode)
-      return p ? (p.city_id?.name || p.city_id?.city_name || '') : ''
-    }
+    if (selectedPin) return selectedPin.city_id?.name || selectedPin.city_id?.city_name || ''
     return ''
-  }, [pincode, pincodes])
+  }, [selectedPin])
 
   const pincodeOptions = useMemo(() => {
     return pincodes.map(p => ({ value: p.id, label: String(p.pinCode || p.pin_name) }))
@@ -370,6 +365,7 @@ function ReplacementPage() {
     setDispatchAddress('')
     setPincode('')
     setPincodeId(null)
+    setSelectedPin(null)
     setClientContactNo('')
     setTypeOfForm('replacement')
     setErrors({})
@@ -592,6 +588,7 @@ function ReplacementPage() {
                     if (pin) {
                       setPincodeId(pin.id)
                       setPincode(String(pin.pinCode || pin.pin_name || ''))
+                      setSelectedPin(pin)
                     }
                   }}
                   onInputKeyDown={(e) => {
