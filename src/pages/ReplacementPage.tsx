@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import { Input, Select, message, Checkbox } from 'antd'
 import dayjs from 'dayjs'
@@ -44,6 +44,7 @@ function ReplacementPage() {
   const [epcGstNo, setEpcGstNo] = useState('')
   const [dispatchAddress, setDispatchAddress] = useState('')
   const [pincode, setPincode] = useState('')
+  const [pincodeId, setPincodeId] = useState<string | null>(null)
   const [clientContactNo, setClientContactNo] = useState('')
   const [typeOfForm, setTypeOfForm] = useState<string>('replacement')
   
@@ -117,19 +118,23 @@ function ReplacementPage() {
   const [hasMorePincodes, setHasMorePincodes] = useState(true)
   const [pincodeSearchTerm, setPincodeSearchTerm] = useState('')
 
+  const pincodesReqRef = useRef(0)
   const fetchPincodes = useCallback(async (search = '', page = 1, append = false) => {
+    const reqId = ++pincodesReqRef.current
     setFetchingPincodes(true)
     try {
       const res = await get(`${GET_PIN_DROPDOWN}?limit=50&page=${page}&search=${encodeURIComponent(search)}`)
+      if (reqId !== pincodesReqRef.current) return // stale response, ignore
       if (res.status && res.data) {
         setPincodes(prev => append ? [...prev, ...res.data] : res.data)
         setHasMorePincodes(page < (res.pagination?.totalPages || 1))
         setPincodePage(page)
       }
     } catch (error) {
+      if (reqId !== pincodesReqRef.current) return
       console.error(error)
     } finally {
-      setFetchingPincodes(false)
+      if (reqId === pincodesReqRef.current) setFetchingPincodes(false)
     }
   }, [])
 
@@ -146,9 +151,13 @@ function ReplacementPage() {
     }
   }
 
+  const pincodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handlePincodeSearch = (val: string) => {
     setPincodeSearchTerm(val)
-    fetchPincodes(val, 1, false)
+    if (pincodeDebounceRef.current) clearTimeout(pincodeDebounceRef.current)
+    pincodeDebounceRef.current = setTimeout(() => {
+      fetchPincodes(val, 1, false)
+    }, 300)
   }
 
   const state = useMemo(() => {
@@ -168,7 +177,7 @@ function ReplacementPage() {
   }, [pincode, pincodes])
 
   const pincodeOptions = useMemo(() => {
-    return pincodes.map(p => ({ value: String(p.pinCode || p.pin_name), label: String(p.pinCode || p.pin_name) }))
+    return pincodes.map(p => ({ value: p.id, label: String(p.pinCode || p.pin_name) }))
   }, [pincodes])
 
   const autoVerifyGstIfReady = async (rawGst: string, forceVerify = false) => {
@@ -360,6 +369,7 @@ function ReplacementPage() {
     setEpcGstNo('')
     setDispatchAddress('')
     setPincode('')
+    setPincodeId(null)
     setClientContactNo('')
     setTypeOfForm('replacement')
     setErrors({})
@@ -386,6 +396,7 @@ function ReplacementPage() {
         epc_gst_no: epcGstNo,
         dispatch_address: dispatchAddress,
         pincode,
+        pincode_id: pincodeId,
         state,
         city,
         client_contact_no: clientContactNo,
@@ -575,8 +586,14 @@ function ReplacementPage() {
                   showSearch
                   placeholder="Pincode"
                   className="w-full h-10 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!bg-[#F9FAFB] hover:[&_.ant-select-selector]:!border-gray-400 [&_.ant-select-selector]:!border-gray-300 [&_.ant-select-selector]:!h-10 [&_.ant-select-selection-item]:!leading-[38px] text-[13px]"
-                  value={pincode || undefined}
-                  onChange={(val) => setPincode(val)}
+                  value={pincodeId || undefined}
+                  onChange={(val) => {
+                    const pin = pincodes.find(p => p.id === val)
+                    if (pin) {
+                      setPincodeId(pin.id)
+                      setPincode(String(pin.pinCode || pin.pin_name || ''))
+                    }
+                  }}
                   onInputKeyDown={(e) => {
                     const key = e.key
                     if (
