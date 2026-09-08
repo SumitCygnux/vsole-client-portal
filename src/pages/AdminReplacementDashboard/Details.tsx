@@ -184,6 +184,18 @@ export default function AdminReplacementDashboardDetails() {
               </Col>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Receiver Name</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.receiver_name || request.reciever_name || 'N/A'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Receiver Contact Number</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.receiver_contact_no || request.reciever_contact_no || request.receiver_contact_number || request.reciever_contact_number || 'N/A'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Dispatch Address</Text>
                   <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.dispatch_address || 'N/A'}</Text>
                 </div>

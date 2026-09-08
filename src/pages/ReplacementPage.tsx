@@ -47,6 +47,8 @@ function ReplacementPage() {
   const [pincodeId, setPincodeId] = useState<string | null>(null)
   const [selectedPin, setSelectedPin] = useState<any>(null)
   const [clientContactNo, setClientContactNo] = useState('')
+  const [receiverName, setReceiverName] = useState('')
+  const [receiverContactNumber, setReceiverContactNumber] = useState('')
   const [typeOfForm, setTypeOfForm] = useState<string>('replacement')
   
   const [verifyGst, setVerifyGst] = useState(false)
@@ -323,6 +325,12 @@ function ReplacementPage() {
     } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/.test(epcGstNo)) {
       newErrors.epcGstNo = 'Invalid GST format (e.g. 22AAAAA0000A1Z5)'
     }
+    if (!receiverName.trim()) newErrors.receiverName = 'Receiver name is required'
+    if (!receiverContactNumber.trim() || receiverContactNumber.length !== 10) {
+      newErrors.receiverContactNumber = 'Valid contact number is required'
+    } else if (!/^[6-9][0-9]{9}$/.test(receiverContactNumber)) {
+      newErrors.receiverContactNumber = 'Must start with 6, 7, 8, or 9'
+    }
     if (!dispatchAddress.trim()) newErrors.dispatchAddress = 'Dispatch address is required'
     if (!pincode.trim() || pincode.length !== 6) newErrors.pincode = 'Valid pincode is required'
     if (!state) newErrors.state = 'State is required'
@@ -344,6 +352,8 @@ function ReplacementPage() {
     correctSerialNo,
     epcName,
     epcGstNo,
+    receiverName,
+    receiverContactNumber,
     dispatchAddress,
     pincode,
     city,
@@ -367,6 +377,8 @@ function ReplacementPage() {
     setPincodeId(null)
     setSelectedPin(null)
     setClientContactNo('')
+    setReceiverName('')
+    setReceiverContactNumber('')
     setTypeOfForm('replacement')
     setErrors({})
   }
@@ -396,6 +408,8 @@ function ReplacementPage() {
         state,
         city,
         client_contact_no: clientContactNo,
+        receiver_name: receiverName,
+        receiver_contact_no: receiverContactNumber,
         type_of_form: typeOfForm,
         is_form_fill: true,
         company_id: selectedComplaint?.company_id,
@@ -639,13 +653,70 @@ function ReplacementPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+              <FormInput
+                label="Receiver name"
+                required
+                value={receiverName}
+                onChange={(val) => {
+                  setReceiverName(val)
+                  if (errors.receiverName) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.receiverName
+                      return next
+                    })
+                  }
+                }}
+                error={errors.receiverName}
+                placeholder="Enter receiver name"
+              />
+              <FormInput
+                label="Receiver contact number"
+                required
+                maxLength={10}
+                value={receiverContactNumber}
+                onChange={(val) => {
+                  const raw = val.replace(/\D/g, '')
+                  let formatted = ''
+                  for (let i = 0; i < raw.length; i++) {
+                    const char = raw[i]
+                    if (i === 0) {
+                      if (/[6-9]/.test(char)) formatted += char
+                    } else {
+                      formatted += char
+                    }
+                  }
+                  setReceiverContactNumber(formatted)
+                  if (errors.receiverContactNumber) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.receiverContactNumber
+                      return next
+                    })
+                  }
+                }}
+                error={errors.receiverContactNumber}
+                placeholder="Enter 10-digit contact number"
+              />
+            </div>
+
             <div>
               <FieldLabel label="Dispatch address" required />
               <TextArea
                 rows={3}
                 className="!border-gray-300 !rounded-lg !bg-[#F9FAFB] hover:!border-gray-400 focus:!border-[#5C6BC0] focus:!bg-white text-[13px]"
                 value={dispatchAddress}
-                onChange={(e) => setDispatchAddress(e.target.value)}
+                onChange={(e) => {
+                  setDispatchAddress(e.target.value)
+                  if (errors.dispatchAddress) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.dispatchAddress
+                      return next
+                    })
+                  }
+                }}
                 status={errors.dispatchAddress ? 'error' : undefined}
               />
               {fieldError('dispatchAddress')}
