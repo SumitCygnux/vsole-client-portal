@@ -408,6 +408,8 @@ function ReplacementPage() {
         state,
         city,
         client_contact_no: clientContactNo,
+        reciever_name: receiverName,
+        reciever_contact_no: receiverContactNumber,
         receiver_name: receiverName,
         receiver_contact_no: receiverContactNumber,
         type_of_form: typeOfForm,
