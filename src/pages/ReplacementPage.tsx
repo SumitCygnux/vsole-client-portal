@@ -15,6 +15,7 @@ type Complaint = {
   id: string
   complaint_no: string
   capacity: string
+  product_name?: string
   serialNo: string
   phase: string
   status: 'open' | 'closed'
@@ -270,10 +271,17 @@ function ReplacementPage() {
         }
 
         if (complaint.status !== 'closed' && complaint.status !== 'resolved' && complaint.status !== 'cancelled') {
+          const resolvedProd = (complaint.product_name && complaint.product_name.toLowerCase() !== 'finish good')
+            ? complaint.product_name
+            : (complaint.capacity && complaint.capacity.toLowerCase() !== 'finish good')
+              ? complaint.capacity
+              : (complaint.product_name || complaint.capacity || '-');
+
           setSelectedComplaint({
             id: complaint.id,
             complaint_no: complaint.complaint_no,
-            capacity: complaint.product_type_name || complaint.capacity || '-',
+            capacity: resolvedProd,
+            product_name: resolvedProd,
             serialNo: complaint.serial_number || complaint.serialNo || '-',
             phase: complaint.phase && complaint.phase !== '-' ? (complaint.phase.toLowerCase().includes('phase') ? complaint.phase : `${complaint.phase}-Phase`) : '1-Phase',
             status: complaint.status,
@@ -315,9 +323,9 @@ function ReplacementPage() {
     const newErrors: FormErrors = {}
 
     if (!selectedComplaint) newErrors.complaintNo = 'Complaint is required'
-    if (capacityRight === null) newErrors.capacityRight = 'Please confirm capacity'
+    if (capacityRight === null) newErrors.capacityRight = 'Please confirm product name'
     if (serialNoRight === null) newErrors.serialNoRight = 'Please confirm serial number'
-    if (capacityRight === false && !correctCapacity.trim()) newErrors.correctCapacity = 'Correct capacity is required'
+    if (capacityRight === false && !correctCapacity.trim()) newErrors.correctCapacity = 'Correct product name is required'
     if (serialNoRight === false && !correctSerialNo.trim()) newErrors.correctSerialNo = 'Correct serial number is required'
     if (!epcName.trim()) newErrors.epcName = 'EPC name is required'
     if (!epcGstNo.trim()) {
@@ -395,7 +403,8 @@ function ReplacementPage() {
         complaint_id: selectedComplaint?.id,
         complaint_number: selectedComplaint?.complaint_no,
         date: formDate.toISOString(),
-        capacity: capacityRight === false ? correctCapacity : selectedComplaint?.capacity,
+        capacity: capacityRight === false ? correctCapacity : (selectedComplaint?.product_name || selectedComplaint?.capacity),
+        product_name: capacityRight === false ? correctCapacity : (selectedComplaint?.product_name || selectedComplaint?.capacity),
         serial_no: serialNoRight === false ? correctSerialNo : selectedComplaint?.serialNo,
         phase: selectedComplaint?.phase,
         capacity_right: capacityRight,
@@ -414,6 +423,7 @@ function ReplacementPage() {
         receiver_contact_no: receiverContactNumber,
         type_of_form: typeOfForm,
         is_form_fill: true,
+        status: 'submitted',
         company_id: selectedComplaint?.company_id,
         location_id: selectedComplaint?.location_id,
         fin_year: selectedComplaint?.fin_year,
@@ -511,7 +521,7 @@ function ReplacementPage() {
 
           <div className="p-6 grid gap-6">
             <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <ReadOnlyField label="Capacity" value={selectedComplaint?.capacity || 'N/A'} />
+              <ReadOnlyField label="Product Name" value={selectedComplaint?.product_name || selectedComplaint?.capacity || 'N/A'} />
               <ReadOnlyField label="Serial no" value={selectedComplaint?.serialNo || 'N/A'} />
               <ReadOnlyField label="Phase" value={selectedComplaint?.phase || 'N/A'} />
               <FormInput
@@ -537,7 +547,7 @@ function ReplacementPage() {
             </div>
 
             <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1 items-start">
-              <ToggleField label="Capacity right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
+              <ToggleField label="Product Name right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
               <ToggleField label="Serial no right?" value={serialNoRight} onChange={setSerialNoRight} error={errors.serialNoRight} />
               <FormInput label="EPC name" required value={epcName} onChange={setEpcName} error={errors.epcName} />
               <div>
@@ -586,7 +596,7 @@ function ReplacementPage() {
             {/* Conditional inputs if toggles are false */}
             {(capacityRight === false || serialNoRight === false) && (
               <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                {capacityRight === false ? <FormInput label="Correct Capacity" required value={correctCapacity} onChange={setCorrectCapacity} error={errors.correctCapacity} /> : <div />}
+                {capacityRight === false ? <FormInput label="Correct Product Name" required value={correctCapacity} onChange={setCorrectCapacity} error={errors.correctCapacity} /> : <div />}
                 {serialNoRight === false ? <FormInput label="Correct Serial No" required value={correctSerialNo} onChange={setCorrectSerialNo} error={errors.correctSerialNo} /> : <div />}
               </div>
             )}

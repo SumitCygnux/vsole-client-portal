@@ -138,7 +138,7 @@ export default function AdminReplacementDashboardDetails() {
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Complaint Number</Text>
-                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.complaint_number || request.complaint_no || request.complaint?.complaint_no}</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.complaint_number || request.complaint_no || request.complaint?.complaint_no || 'N/A'}</Text>
                 </div>
               </Col>
               <Col span={24}>
@@ -161,6 +161,26 @@ export default function AdminReplacementDashboardDetails() {
               </Col>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Product Name</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>
+                    {request.product_name || request.complaint?.product_name || (request.capacity && request.capacity.toLowerCase() !== 'finish good' ? request.capacity : null) || request.product || 'N/A'}
+                  </Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Phase</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.phase || 'N/A'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Type of Form</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500, textTransform: 'capitalize' }}>{request.type_of_form || 'Replacement'}</Text>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Created Date</Text>
                   <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.created_at ? dayjs(request.created_at).format('DD MMM YYYY') : 'N/A'}</Text>
                 </div>
@@ -178,8 +198,8 @@ export default function AdminReplacementDashboardDetails() {
             <Row gutter={[16, 24]}>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Correct Serial Number</Text>
-                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.correct_serial_number || request.serial_no || request.complaint?.serial_number || 'N/A'}</Text>
+                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Serial Number</Text>
+                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.serial_no || request.correct_serial_number || request.complaint?.serial_number || 'N/A'}</Text>
                 </div>
               </Col>
               <Col span={24}>
@@ -229,11 +249,13 @@ export default function AdminReplacementDashboardDetails() {
         </Col>
       </Row>
 
-      {request.remarks && request.remarks.includes('Rejection Reason:') && (
+      {(request.status === 'rejected' || (request.remarks && request.remarks.includes('Rejection Reason:'))) && (
         <div style={{ marginTop: '24px' }}>
           <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#fef2f2', borderRadius: '8px', borderLeft: '4px solid #ef4444' }}>
             <Text style={{ color: '#991b1b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Rejection Reason</Text>
-            <Text style={{ color: '#b91c1c' }}>{request.remarks.split('Rejection Reason:')[1]}</Text>
+            <Text style={{ color: '#b91c1c' }}>
+              {request.remarks?.includes('Rejection Reason:') ? request.remarks.split('Rejection Reason:')[1]?.trim() : (request.remarks || 'Rejected by Administrator')}
+            </Text>
           </div>
         </div>
       )}
