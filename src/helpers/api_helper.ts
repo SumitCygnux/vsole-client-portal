@@ -18,7 +18,7 @@ axiosApi.interceptors.request.use(
     
     // Pass the default tenant_id for all requests
     config.params = config.params || {};
-    config.params.tenant_id = 'eff743de-5dc4-46d9-8322-95b95604ec49';
+    config.params.tenant_id = import.meta.env.VITE_TENANT_ID || '-';
     
     return config;
   },
