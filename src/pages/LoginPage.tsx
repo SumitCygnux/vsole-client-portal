@@ -155,11 +155,12 @@ function LoginPage() {
         }
         message.success('Login successful!');
         const locationState = location.state as { from?: Location };
-        const fromPath = locationState?.from?.pathname + (locationState?.from?.search || '');
+        const rawFrom = locationState?.from?.pathname ? (locationState.from.pathname + (locationState.from.search || '')) : '';
+        const isValidFrom = rawFrom && rawFrom !== '/' && !rawFrom.includes('undefined') && !rawFrom.includes('/login');
         if (role === 'admin') {
-          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.ADMIN_WARRANTY_REQUESTS, { replace: true });
+          navigate(isValidFrom ? rawFrom : ROUTES.ADMIN_WARRANTY_REQUESTS, { replace: true });
         } else {
-          navigate(fromPath && fromPath !== '/' ? fromPath : ROUTES.DASHBOARD, { replace: true });
+          navigate(isValidFrom ? rawFrom : ROUTES.DASHBOARD, { replace: true });
         }
       }
     } catch (e) {

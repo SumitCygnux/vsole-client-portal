@@ -69,7 +69,7 @@ function ReplacementPage() {
     try {
       const userRole = localStorage.getItem('customerRole') || 'customer'
       const customerId = localStorage.getItem('customerId')
-      let url = `${GET_COMPLAINTS}?limit=10&page=${page}&search=${encodeURIComponent(search)}`
+      let url = `${GET_COMPLAINTS}?limit=10&page=${page}&search=${encodeURIComponent(search)}&exclude_replaced=true&review_status=replacement,replacement_test`
       
       // If admin, they can access all complaints without company/location/fin_year or customer_id restrictions
       // If regular customer, restrict strictly to their own customer_id
