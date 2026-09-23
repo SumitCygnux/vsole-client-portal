@@ -64,7 +64,16 @@ function ReplacementPage() {
   const fetchComplaints = useCallback(async (search = '', page = 1, append = false) => {
     setFetchingComplaints(true)
     try {
-      const res = await get(`${GET_COMPLAINTS}?limit=10&page=${page}&search=${encodeURIComponent(search)}`)
+      const userRole = localStorage.getItem('customerRole') || 'customer'
+      const customerId = localStorage.getItem('customerId')
+      let url = `${GET_COMPLAINTS}?limit=10&page=${page}&search=${encodeURIComponent(search)}`
+      
+      // If admin, they can access all complaints without company/location/fin_year or customer_id restrictions
+      // If regular customer, restrict strictly to their own customer_id
+      if (userRole !== 'admin' && customerId) {
+        url += `&customer_id=${encodeURIComponent(customerId)}`
+      }
+      const res = await get(url)
       if (res.success && res.data) {
         const newOptions = res.data.map((c: any) => ({
           label: c.complaint_no,
