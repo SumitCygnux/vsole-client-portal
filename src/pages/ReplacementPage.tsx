@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined, CloseCircleFilled } from '@ant-design/icons'
 import { Input, Select, message, Checkbox } from 'antd'
 import dayjs from 'dayjs'
 import axios from 'axios'
@@ -108,22 +108,14 @@ function ReplacementPage() {
     }
   }
 
+  const complaintDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleDropdownSearch = (val: string) => {
     setComplaintSearchTerm(val)
-    fetchComplaints(val, 1, false)
+    if (complaintDebounceRef.current) clearTimeout(complaintDebounceRef.current)
+    complaintDebounceRef.current = setTimeout(() => {
+      fetchComplaints(val, 1, false)
+    }, 300)
   }
-
-  useEffect(() => {
-    const fetchPincodes = async () => {
-      try {
-        const res = await get(GET_PIN_DROPDOWN)
-        if (res.status) setPincodes(res.data)
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    fetchPincodes()
-  }, [])
 
   const [pincodes, setPincodes] = useState<any[]>([])
   const [fetchingPincodes, setFetchingPincodes] = useState(false)
@@ -241,27 +233,16 @@ function ReplacementPage() {
     }
   }
 
-  useEffect(() => {
-    if (complaintQuery) {
-      setComplaintSearch(complaintQuery)
-    }
-  }, [complaintQuery])
-
   const [verifying, setVerifying] = useState(false)
+  const lastVerifiedRef = useRef<string>('')
+  const complaintPasteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (complaintSearch.length > 3) {
-        verifyComplaint(complaintSearch)
-      } else if (!complaintSearch) {
-        setSelectedComplaint(null)
-        setComplaintError('')
-      }
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [complaintSearch])
+  const verifyComplaint = async (rawValue: string) => {
+    const value = rawValue?.trim() || ''
+    if (!value || value.length < 3) return
+    if (lastVerifiedRef.current === value && selectedComplaint?.complaint_no === value) return
+    lastVerifiedRef.current = value
 
-  const verifyComplaint = async (value: string) => {
     setVerifying(true)
     try {
       const token = localStorage.getItem('authToken')
@@ -275,7 +256,6 @@ function ReplacementPage() {
         if (complaint.is_form_fill) {
           setSelectedComplaint(null)
           setComplaintError('A replacement request has already been submitted for this complaint.')
-          setVerifying(false)
           return
         }
 
@@ -297,6 +277,11 @@ function ReplacementPage() {
             company_id: complaint.company_id,
             location_id: complaint.location_id,
             fin_year: complaint.fin_year
+          })
+          setComplaintSearch(complaint.complaint_no)
+          setComplaintOptions(prev => {
+            if (prev.some(o => o.value === complaint.complaint_no)) return prev
+            return [{ label: complaint.complaint_no, value: complaint.complaint_no }, ...prev]
           })
           setComplaintError('')
           setCapacityRight(true)
@@ -324,9 +309,39 @@ function ReplacementPage() {
     }
   }
 
-  const handleComplaintVerify = (value: string) => {
-    setComplaintSearch(value)
+  const handleSelectComplaint = (value: string | undefined | null) => {
+    if (!value) {
+      lastVerifiedRef.current = ''
+      setComplaintSearch('')
+      setSelectedComplaint(null)
+      setComplaintError('')
+      return
+    }
+    const trimmed = value.trim()
+    setComplaintSearch(trimmed)
+    verifyComplaint(trimmed)
   }
+
+  useEffect(() => {
+    if (complaintQuery) {
+      handleSelectComplaint(complaintQuery)
+    }
+  }, [complaintQuery])
+
+  useEffect(() => {
+    if (!localStorage.getItem('authToken')) {
+      const timer = setTimeout(() => {
+        if (complaintSearch.trim().length > 3) {
+          verifyComplaint(complaintSearch.trim())
+        } else if (!complaintSearch) {
+          setSelectedComplaint(null)
+          setComplaintError('')
+          lastVerifiedRef.current = ''
+        }
+      }, 600)
+      return () => clearTimeout(timer)
+    }
+  }, [complaintSearch])
 
   const validate = useCallback(() => {
     const newErrors: FormErrors = {}
@@ -380,6 +395,7 @@ function ReplacementPage() {
   ])
 
   const resetForm = () => {
+    lastVerifiedRef.current = ''
     setComplaintSearch('')
     setSelectedComplaint(null)
     setComplaintError('')
@@ -474,41 +490,84 @@ function ReplacementPage() {
               <span className="text-[13px] font-semibold text-gray-800">Replacement</span>
             </div>
 
-            <div className="flex flex-col gap-1 min-w-[180px] max-w-[280px]">
-              <div className={`flex flex-col items-center text-center bg-white border rounded-[6px] px-4 py-2 w-full shadow-sm h-[60px] justify-center ${errors.complaintNo || complaintError ? 'border-red-400' : 'border-gray-200'}`}>
+            <div className="flex flex-col gap-1 min-w-[220px] max-w-[280px]">
+              <div 
+                className={`flex flex-col items-center text-center bg-white border rounded-[6px] px-3 py-2 w-full shadow-sm h-[60px] justify-center ${errors.complaintNo || complaintError ? 'border-red-400' : 'border-gray-200'}`}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData('text')?.trim()
+                  if (pasted) {
+                    e.preventDefault()
+                    handleSelectComplaint(pasted)
+                  }
+                }}
+              >
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex gap-1 justify-center w-full">COMPLAINT NO <span className="text-red-500">*</span></span>
-                {localStorage.getItem('authToken') ? (
-                  <Select
-                    showSearch
-                    variant="borderless"
-                    className="w-full text-center [&_.ant-select-selector]:!p-0 [&_.ant-select-selection-item]:!font-semibold [&_.ant-select-selection-item]:!text-gray-800 [&_.ant-select-selection-item]:!text-[13px] [&_.ant-select-selection-search-input]:!text-center [&_.ant-select-arrow]:!hidden"
-                    placeholder="Select complaint"
-                    value={complaintSearch || undefined}
-                    onChange={(val) => handleComplaintVerify(val)}
-                    onSearch={(val) => {
-                      handleComplaintVerify(val)
-                      handleDropdownSearch(val)
-                    }}
-                    onPopupScroll={handlePopupScroll}
-                    suffixIcon={null}
-                    showArrow={false}
-                    listHeight={250}
-                    dropdownClassName="[&_.ant-select-item]:!text-center"
-                    filterOption={false}
-                    options={complaintOptions}
-                    loading={fetchingComplaints}
-                    disabled={verifying || !!complaintQuery}
-                  />
-                ) : (
-                  <Input
-                    variant="borderless"
-                    className="!p-0 !font-semibold text-gray-800 text-[13px] placeholder:font-normal placeholder:text-gray-400 !bg-transparent h-auto leading-tight text-center disabled:!text-gray-800 disabled:!opacity-100 [&_input]:disabled:!text-gray-800"
-                    placeholder="Enter complaint number"
-                    value={complaintSearch}
-                    onChange={(e) => handleComplaintVerify(e.target.value)}
-                    disabled={verifying || !!complaintQuery}
-                  />
-                )}
+                <div className="relative w-full flex items-center justify-center">
+                  {localStorage.getItem('authToken') ? (
+                    <Select
+                      showSearch
+                      variant="borderless"
+                      className="w-full text-center [&_.ant-select-selector]:!p-0 [&_.ant-select-selection-item]:!font-semibold [&_.ant-select-selection-item]:!text-gray-800 [&_.ant-select-selection-item]:!text-[13px] [&_.ant-select-selection-search-input]:!text-center [&_.ant-select-arrow]:!hidden [&_.ant-select-clear]:!hidden"
+                      placeholder="Select complaint"
+                      value={complaintSearch || undefined}
+                      onChange={(val) => handleSelectComplaint(val)}
+                      onSearch={(val) => {
+                        const trimmed = val ? val.trim() : ''
+                        if (trimmed) {
+                          handleDropdownSearch(trimmed)
+                          if (trimmed.length >= 8 && trimmed.includes('/')) {
+                            if (complaintPasteTimerRef.current) clearTimeout(complaintPasteTimerRef.current)
+                            complaintPasteTimerRef.current = setTimeout(() => {
+                              handleSelectComplaint(trimmed)
+                            }, 350)
+                          }
+                        }
+                      }}
+                      onInputKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const inputVal = (e.target as HTMLInputElement).value?.trim()
+                          if (inputVal) {
+                            handleSelectComplaint(inputVal)
+                          }
+                        }
+                      }}
+                      onPopupScroll={handlePopupScroll}
+                      suffixIcon={null}
+                      listHeight={250}
+                      popupMatchSelectWidth={false}
+                      dropdownStyle={{ minWidth: 220 }}
+                      popupClassName="[&_.ant-select-item]:!text-center min-w-[220px]"
+                      dropdownClassName="[&_.ant-select-item]:!text-center min-w-[220px]"
+                      filterOption={false}
+                      options={complaintOptions}
+                      loading={fetchingComplaints || verifying}
+                      disabled={!!complaintQuery}
+                    />
+                  ) : (
+                    <Input
+                      variant="borderless"
+                      className="!p-0 !font-semibold text-gray-800 text-[13px] placeholder:font-normal placeholder:text-gray-400 !bg-transparent h-auto leading-tight text-center disabled:!text-gray-800 disabled:!opacity-100 [&_input]:disabled:!text-gray-800"
+                      placeholder="Enter complaint number"
+                      value={complaintSearch}
+                      onChange={(e) => setComplaintSearch(e.target.value)}
+                      disabled={!!complaintQuery}
+                    />
+                  )}
+
+                  {complaintSearch && !complaintQuery && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectComplaint(null)
+                      }}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded-full hover:bg-gray-100 flex items-center justify-center cursor-pointer z-10"
+                      title="Clear complaint"
+                    >
+                      <CloseCircleFilled className="text-[14px]" />
+                    </button>
+                  )}
+                </div>
               </div>
               {(errors.complaintNo || complaintError) && (
                 <span className="text-[11px] text-red-500 text-center leading-tight mt-0.5">
