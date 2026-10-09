@@ -7,6 +7,7 @@ import {
   message,
   Input,
   Select,
+  AutoComplete,
   Tooltip,
   Empty,
   Drawer,
@@ -30,7 +31,10 @@ import {
   CloseOutlined,
 } from '@ant-design/icons'
 import { get } from '@/helpers/api_helper'
-import { GET_REPLACEMENT_DETAILS } from '@/helpers/url_helper'
+import {
+  GET_REPLACEMENT_DETAILS,
+  GET_STATE_DROPDOWN,
+} from '@/helpers/url_helper'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
 import dayjs, { Dayjs } from 'dayjs'
@@ -42,6 +46,7 @@ interface DrawerFilterState {
   toFormNo: string
   complaintNo: string
   serialNo: string
+  customer: string
   epc: string
   item: string
   dateRange: [Dayjs | null, Dayjs | null] | null
@@ -54,6 +59,7 @@ const initialFilters: DrawerFilterState = {
   toFormNo: '',
   complaintNo: '',
   serialNo: '',
+  customer: '',
   epc: '',
   item: '',
   dateRange: null,
@@ -61,19 +67,51 @@ const initialFilters: DrawerFilterState = {
   status: 'ALL',
 }
 
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir',
-  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
-  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
-  'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-]
+interface DynamicFilterOptions {
+  states: string[]
+  customers: string[]
+  items: string[]
+  epcs: string[]
+  form_numbers: string[]
+  complaint_numbers: string[]
+  serial_numbers: string[]
+  statuses: string[]
+}
+
 
 export default function AdminReplacementDashboard() {
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 })
   const navigate = useNavigate()
+
+  // Dynamic status counts and filter options from backend
+  const [filterOptions, setFilterOptions] = useState<DynamicFilterOptions>({
+    states: [],
+    customers: [],
+    items: [],
+    epcs: [],
+    form_numbers: [],
+    complaint_numbers: [],
+    serial_numbers: [],
+    statuses: [],
+  })
+
+  const [masterStates, setMasterStates] = useState<string[]>([])
+
+  const [statusCounts, setStatusCounts] = useState<{
+    total: number
+    submitted: number
+    approved: number
+    rejected: number
+    draft: number
+  }>({
+    total: 0,
+    submitted: 0,
+    approved: 0,
+    rejected: 0,
+    draft: 0,
+  })
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('')
@@ -84,6 +122,65 @@ export default function AdminReplacementDashboard() {
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [drawerFilters, setDrawerFilters] = useState<DrawerFilterState>(initialFilters)
   const [appliedFilters, setAppliedFilters] = useState<DrawerFilterState>(initialFilters)
+
+  // Fetch status counts dynamically from backend
+  const fetchStatusCounts = async () => {
+    try {
+      const res = await get('/customer-replacement-detail/status-counts')
+      if (res?.status && res?.data) {
+        setStatusCounts({
+          total: Number(res.data.total) || 0,
+          submitted: Number(res.data.submitted) || 0,
+          approved: Number(res.data.approved) || 0,
+          rejected: Number(res.data.rejected) || 0,
+          draft: Number(res.data.draft) || 0,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load status counts:', error)
+    }
+  }
+
+  // Fetch filter options dynamically from backend (including all State Master states)
+  const fetchFilterOptions = async () => {
+    try {
+      const res = await get('/customer-replacement-detail/filter-options')
+      if (res?.status && res?.data) {
+        setFilterOptions({
+          states: res.data.states || [],
+          customers: res.data.customers || [],
+          items: res.data.items || [],
+          epcs: res.data.epcs || [],
+          form_numbers: res.data.form_numbers || [],
+          complaint_numbers: res.data.complaint_numbers || [],
+          serial_numbers: res.data.serial_numbers || [],
+          statuses: res.data.statuses || ['submitted', 'approved', 'rejected', 'draft'],
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load filter options:', error)
+    }
+
+    // Also fetch State Master explicitly to ensure every master state is included
+    try {
+      const stateRes = await get(GET_STATE_DROPDOWN)
+      const dataList = stateRes?.data || stateRes || []
+      if (Array.isArray(dataList)) {
+        const mStates = dataList
+          .map((s: any) => (typeof s === 'string' ? s : s?.name || s?.state_name || ''))
+          .filter(Boolean)
+        setMasterStates(mStates)
+      }
+    } catch (e) {
+      console.error('Failed to load state master:', e)
+    }
+  }
+
+  // Load dynamic filters & status counts on mount
+  useEffect(() => {
+    fetchFilterOptions()
+    fetchStatusCounts()
+  }, [])
 
   // Debounce search input
   useEffect(() => {
@@ -148,6 +245,7 @@ export default function AdminReplacementDashboard() {
       if (filters?.toFormNo?.trim()) params.doc_no_to = filters.toFormNo.trim()
       if (filters?.complaintNo?.trim()) params.complaint_id = filters.complaintNo.trim()
       if (filters?.serialNo?.trim()) params.serial_no = filters.serialNo.trim()
+      if (filters?.customer?.trim()) params.customer_name = filters.customer.trim()
       if (filters?.epc?.trim()) params.epc = filters.epc.trim()
       if (filters?.item?.trim()) params.item = filters.item.trim()
 
@@ -183,15 +281,19 @@ export default function AdminReplacementDashboard() {
     navigate(ROUTES.ADMIN_REPLACEMENT_REQUEST_DETAILS.replace(':id', record.id))
   }
 
-  // Extract distinct States for Drawer Filter
+  // Extract distinct States for Drawer Filter dynamically from State Master + database records
   const stateOptions = useMemo(() => {
-    const set = new Set<string>(INDIAN_STATES)
+    const set = new Set<string>([
+      ...(filterOptions.states || []),
+      ...masterStates,
+    ])
     requests.forEach(r => {
       const st = getStateName(r)
       if (st && st !== '—' && st !== '-') set.add(st)
     })
     return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [requests, getStateName])
+  }, [filterOptions.states, masterStates, requests, getStateName])
+
 
   // Active filter count for the badge
   const activeDrawerFilterCount = useMemo(() => {
@@ -200,6 +302,7 @@ export default function AdminReplacementDashboard() {
     if (appliedFilters.toFormNo.trim()) count++
     if (appliedFilters.complaintNo.trim()) count++
     if (appliedFilters.serialNo.trim()) count++
+    if (appliedFilters.customer?.trim()) count++
     if (appliedFilters.epc.trim()) count++
     if (appliedFilters.item.trim()) count++
     if (appliedFilters.dateRange && appliedFilters.dateRange[0] && appliedFilters.dateRange[1]) count++
@@ -227,6 +330,8 @@ export default function AdminReplacementDashboard() {
     setStatusFilter('ALL')
     setPagination(prev => ({ ...prev, page: 1 }))
     fetchRequests(1, pagination.limit, debouncedSearch, 'ALL', initialFilters)
+    fetchStatusCounts()
+    fetchFilterOptions()
   }
 
   // Clear all filters completely
@@ -238,6 +343,8 @@ export default function AdminReplacementDashboard() {
     setAppliedFilters(initialFilters)
     setPagination(prev => ({ ...prev, page: 1 }))
     fetchRequests(1, pagination.limit, '', 'ALL', initialFilters)
+    fetchStatusCounts()
+    fetchFilterOptions()
   }
 
   // Remove a single active filter tag
@@ -273,29 +380,16 @@ export default function AdminReplacementDashboard() {
     fetchRequests(1, pagination.limit, debouncedSearch, nextStatus, nextFilters)
   }
 
-  // Count summaries for metrics chips
+  // Dynamic metrics from backend status-counts API
   const metrics = useMemo(() => {
-    let submitted = 0
-    let approved = 0
-    let rejected = 0
-    let other = 0
-
-    requests.forEach(r => {
-      const st = (r.status || '').toLowerCase()
-      if (st === 'submitted') submitted++
-      else if (st === 'approved') approved++
-      else if (st === 'rejected') rejected++
-      else other++
-    })
-
     return {
-      total: requests.length,
-      submitted,
-      approved,
-      rejected,
-      other,
+      total: statusCounts.total || pagination.total || requests.length,
+      submitted: statusCounts.submitted,
+      approved: statusCounts.approved,
+      rejected: statusCounts.rejected,
+      draft: statusCounts.draft,
     }
-  }, [requests])
+  }, [statusCounts, pagination.total, requests.length])
 
   const hasAnyFilterActive =
     searchQuery !== '' || statusFilter !== 'ALL' || activeDrawerFilterCount > 0
@@ -449,12 +543,28 @@ export default function AdminReplacementDashboard() {
       title: 'Customer Name',
       dataIndex: 'customer_name',
       key: 'customer_name',
-      width: 250,
+      width: 220,
       render: (text: string) => (
         <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '13px', whiteSpace: 'nowrap', display: 'block' }}>
           {text || '—'}
         </span>
       ),
+    },
+    {
+      title: 'EPC Name',
+      key: 'epc_name',
+      width: 180,
+      render: (_: any, record: any) => {
+        const epc = record.epc_name || record.complaint?.epc_name
+        if (!epc || epc === '-') {
+          return <span style={{ color: '#94a3b8' }}>—</span>
+        }
+        return (
+          <span style={{ fontWeight: 500, color: '#334155', fontSize: '13px', whiteSpace: 'nowrap' }}>
+            {epc}
+          </span>
+        )
+      },
     },
     {
       title: 'Created By',
@@ -568,7 +678,11 @@ export default function AdminReplacementDashboard() {
         <Tooltip title="Reload latest data">
           <Button
             icon={<ReloadOutlined spin={loading} />}
-            onClick={() => fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter, appliedFilters)}
+            onClick={() => {
+              fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter, appliedFilters)
+              fetchStatusCounts()
+              fetchFilterOptions()
+            }}
             style={{ borderRadius: '8px' }}
           >
             Refresh
@@ -787,10 +901,10 @@ export default function AdminReplacementDashboard() {
               style={{ width: 150 }}
               options={[
                 { value: 'ALL', label: 'All Statuses' },
-                { value: 'submitted', label: 'Submitted' },
-                { value: 'approved', label: 'Approved' },
-                { value: 'rejected', label: 'Rejected' },
-                { value: 'draft', label: 'Draft' },
+                ...filterOptions.statuses.map(s => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(),
+                })),
               ]}
             />
 
@@ -873,6 +987,11 @@ export default function AdminReplacementDashboard() {
             {appliedFilters.serialNo && (
               <Tag closable onClose={() => handleRemoveTag('serialNo', '')} color="purple">
                 Serial No: {appliedFilters.serialNo}
+              </Tag>
+            )}
+            {appliedFilters.customer && (
+              <Tag closable onClose={() => handleRemoveTag('customer', '')} color="volcano">
+                Customer: {appliedFilters.customer}
               </Tag>
             )}
             {appliedFilters.epc && (
@@ -964,7 +1083,7 @@ export default function AdminReplacementDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FilterOutlined style={{ color: '#0B63CE', fontSize: '18px' }} />
             <span style={{ fontWeight: 700, fontSize: '16px', color: '#0f172a' }}>
-              Filter Complaints Report
+              Filter Replacement Forms
             </span>
           </div>
         }
@@ -1014,22 +1133,30 @@ export default function AdminReplacementDashboard() {
             <Row gutter={12}>
               <Col span={12}>
                 <label style={drawerLabelStyle}>From Doc No.</label>
-                <Input
+                <AutoComplete
                   placeholder="Search from..."
                   value={drawerFilters.fromFormNo}
-                  onChange={e => setDrawerFilters({ ...drawerFilters, fromFormNo: e.target.value })}
+                  onChange={val => setDrawerFilters({ ...drawerFilters, fromFormNo: val })}
+                  options={filterOptions.form_numbers.map(fn => ({ value: fn, label: fn }))}
+                  filterOption={(inputValue, option) =>
+                    (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+                  }
                   allowClear
-                  style={drawerInputStyle}
+                  style={{ width: '100%' }}
                 />
               </Col>
               <Col span={12}>
                 <label style={drawerLabelStyle}>To Doc No.</label>
-                <Input
+                <AutoComplete
                   placeholder="Search to..."
                   value={drawerFilters.toFormNo}
-                  onChange={e => setDrawerFilters({ ...drawerFilters, toFormNo: e.target.value })}
+                  onChange={val => setDrawerFilters({ ...drawerFilters, toFormNo: val })}
+                  options={filterOptions.form_numbers.map(fn => ({ value: fn, label: fn }))}
+                  filterOption={(inputValue, option) =>
+                    (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+                  }
                   allowClear
-                  style={drawerInputStyle}
+                  style={{ width: '100%' }}
                 />
               </Col>
             </Row>
@@ -1038,24 +1165,48 @@ export default function AdminReplacementDashboard() {
           {/* SERIAL NO. */}
           <div>
             <label style={drawerLabelStyle}>Serial No.</label>
-            <Input
+            <AutoComplete
               placeholder="Search serial no..."
               value={drawerFilters.serialNo}
-              onChange={e => setDrawerFilters({ ...drawerFilters, serialNo: e.target.value })}
+              onChange={val => setDrawerFilters({ ...drawerFilters, serialNo: val })}
+              options={filterOptions.serial_numbers.map(sn => ({ value: sn, label: sn }))}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+              }
               allowClear
-              style={drawerInputStyle}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          {/* CUSTOMER */}
+          <div>
+            <label style={drawerLabelStyle}>Customer</label>
+            <AutoComplete
+              placeholder="Search customer..."
+              value={drawerFilters.customer}
+              onChange={val => setDrawerFilters({ ...drawerFilters, customer: val })}
+              options={filterOptions.customers.map(c => ({ value: c, label: c }))}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+              }
+              allowClear
+              style={{ width: '100%' }}
             />
           </div>
 
           {/* EPC */}
           <div>
             <label style={drawerLabelStyle}>EPC</label>
-            <Input
+            <AutoComplete
               placeholder="Search EPC..."
               value={drawerFilters.epc}
-              onChange={e => setDrawerFilters({ ...drawerFilters, epc: e.target.value })}
+              onChange={val => setDrawerFilters({ ...drawerFilters, epc: val })}
+              options={filterOptions.epcs.map(epc => ({ value: epc, label: epc }))}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+              }
               allowClear
-              style={drawerInputStyle}
+              style={{ width: '100%' }}
             />
           </div>
 
@@ -1074,24 +1225,32 @@ export default function AdminReplacementDashboard() {
           {/* ITEM */}
           <div>
             <label style={drawerLabelStyle}>Item</label>
-            <Input
+            <AutoComplete
               placeholder="Search item..."
               value={drawerFilters.item}
-              onChange={e => setDrawerFilters({ ...drawerFilters, item: e.target.value })}
+              onChange={val => setDrawerFilters({ ...drawerFilters, item: val })}
+              options={filterOptions.items.map(it => ({ value: it, label: it }))}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+              }
               allowClear
-              style={drawerInputStyle}
+              style={{ width: '100%' }}
             />
           </div>
 
           {/* COMPLAINT NO. */}
           <div>
             <label style={drawerLabelStyle}>Complaint No.</label>
-            <Input
+            <AutoComplete
               placeholder="Search complaint no..."
               value={drawerFilters.complaintNo}
-              onChange={e => setDrawerFilters({ ...drawerFilters, complaintNo: e.target.value })}
+              onChange={val => setDrawerFilters({ ...drawerFilters, complaintNo: val })}
+              options={filterOptions.complaint_numbers.map(cn => ({ value: cn, label: cn }))}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toString().toLowerCase().indexOf(inputValue.toLowerCase()) ?? -1) !== -1
+              }
               allowClear
-              style={drawerInputStyle}
+              style={{ width: '100%' }}
             />
           </div>
 
@@ -1104,10 +1263,10 @@ export default function AdminReplacementDashboard() {
               style={{ width: '100%' }}
               options={[
                 { value: 'ALL', label: 'All Status' },
-                { value: 'submitted', label: 'Submitted' },
-                { value: 'approved', label: 'Approved' },
-                { value: 'rejected', label: 'Rejected' },
-                { value: 'draft', label: 'Draft' },
+                ...filterOptions.statuses.map(s => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(),
+                })),
               ]}
             />
           </div>
@@ -1121,6 +1280,9 @@ export default function AdminReplacementDashboard() {
               showSearch
               placeholder="Select states..."
               style={{ width: '100%' }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
               options={[
                 { value: 'ALL', label: 'All States' },
                 ...stateOptions.map(st => ({ value: st, label: st })),
