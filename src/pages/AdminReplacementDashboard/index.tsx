@@ -1,5 +1,21 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Card, Typography, Table, Button, message, Input, Select, Tooltip, Empty } from 'antd'
+import {
+  Card,
+  Typography,
+  Table,
+  Button,
+  message,
+  Input,
+  Select,
+  Tooltip,
+  Empty,
+  Drawer,
+  DatePicker,
+  Row,
+  Col,
+  Badge,
+  Tag,
+} from 'antd'
 import {
   EyeOutlined,
   SearchOutlined,
@@ -10,14 +26,48 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  FilterOutlined,
+  CloseOutlined,
 } from '@ant-design/icons'
 import { get } from '@/helpers/api_helper'
 import { GET_REPLACEMENT_DETAILS } from '@/helpers/url_helper'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/app'
-import dayjs from 'dayjs'
+import dayjs, { Dayjs } from 'dayjs'
 
 const { Title, Text } = Typography
+
+interface DrawerFilterState {
+  fromFormNo: string
+  toFormNo: string
+  complaintNo: string
+  serialNo: string
+  epc: string
+  item: string
+  dateRange: [Dayjs | null, Dayjs | null] | null
+  state: string
+  status: string
+}
+
+const initialFilters: DrawerFilterState = {
+  fromFormNo: '',
+  toFormNo: '',
+  complaintNo: '',
+  serialNo: '',
+  epc: '',
+  item: '',
+  dateRange: null,
+  state: 'ALL',
+  status: 'ALL',
+}
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
+  'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+]
 
 export default function AdminReplacementDashboard() {
   const [requests, setRequests] = useState<any[]>([])
@@ -29,6 +79,11 @@ export default function AdminReplacementDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
+
+  // Slide-over Filter Drawer states
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [drawerFilters, setDrawerFilters] = useState<DrawerFilterState>(initialFilters)
+  const [appliedFilters, setAppliedFilters] = useState<DrawerFilterState>(initialFilters)
 
   // Debounce search input
   useEffect(() => {
@@ -73,17 +128,33 @@ export default function AdminReplacementDashboard() {
     return typeof s === 'string' ? s.trim() : ''
   }, [])
 
+  // API Fetch with full backend filter support
   const fetchRequests = async (
     page = pagination.page,
     limit = pagination.limit,
     search = debouncedSearch,
-    status = statusFilter
+    status = statusFilter,
+    filters = appliedFilters
   ) => {
     setLoading(true)
     try {
       const params: any = { limit, page }
-      if (search) params.search = search
-      if (status && status !== 'ALL') params.status = status
+      if (search && search.trim()) params.search = search.trim()
+
+      const effStatus = (filters?.status && filters.status !== 'ALL') ? filters.status : (status !== 'ALL' ? status : undefined)
+      if (effStatus) params.status = effStatus
+
+      if (filters?.fromFormNo?.trim()) params.doc_no_from = filters.fromFormNo.trim()
+      if (filters?.toFormNo?.trim()) params.doc_no_to = filters.toFormNo.trim()
+      if (filters?.complaintNo?.trim()) params.complaint_id = filters.complaintNo.trim()
+      if (filters?.serialNo?.trim()) params.serial_no = filters.serialNo.trim()
+      if (filters?.epc?.trim()) params.epc = filters.epc.trim()
+      if (filters?.item?.trim()) params.item = filters.item.trim()
+
+      if (filters?.dateRange?.[0]) params.date_from = filters.dateRange[0].format('YYYY-MM-DD')
+      if (filters?.dateRange?.[1]) params.date_to = filters.dateRange[1].format('YYYY-MM-DD')
+
+      if (filters?.state && filters.state !== 'ALL') params.state = filters.state
 
       const res = await get(GET_REPLACEMENT_DETAILS, { params })
       if (res.status && res.data) {
@@ -105,48 +176,102 @@ export default function AdminReplacementDashboard() {
 
   // Trigger fetch when pagination, debouncedSearch or statusFilter changes
   useEffect(() => {
-    fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter)
+    fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter, appliedFilters)
   }, [pagination.page, pagination.limit, debouncedSearch, statusFilter])
 
   const handleView = (record: any) => {
     navigate(ROUTES.ADMIN_REPLACEMENT_REQUEST_DETAILS.replace(':id', record.id))
   }
 
-  // Client-side filtering ensures instant reactivity on search & status
-  const filteredRequests = useMemo(() => {
-    return requests.filter(record => {
-      // 1. Search Query filter (matches Form No, Complaint No, Serial No, Customer Name, State, City, Created By)
-      if (debouncedSearch) {
-        const q = debouncedSearch.toLowerCase()
-        const formNo = (record.form_no || '').toLowerCase()
-        const compNo = (record.complaint_number || record.complaint_no || '').toLowerCase()
-        const sn = getSerialNumber(record).toLowerCase()
-        const custName = (record.customer_name || '').toLowerCase()
-        const stateName = getStateName(record).toLowerCase()
-        const cityName = (record.city || '').toLowerCase()
-        const createdBy = (record.created_by_name || '').toLowerCase()
-
-        const matchesSearch =
-          formNo.includes(q) ||
-          compNo.includes(q) ||
-          sn.includes(q) ||
-          custName.includes(q) ||
-          stateName.includes(q) ||
-          cityName.includes(q) ||
-          createdBy.includes(q)
-
-        if (!matchesSearch) return false
-      }
-
-      // 2. Status filter
-      if (statusFilter !== 'ALL') {
-        const currentStatus = (record.status || 'draft').toLowerCase()
-        if (currentStatus !== statusFilter.toLowerCase()) return false
-      }
-
-      return true
+  // Extract distinct States for Drawer Filter
+  const stateOptions = useMemo(() => {
+    const set = new Set<string>(INDIAN_STATES)
+    requests.forEach(r => {
+      const st = getStateName(r)
+      if (st && st !== '—' && st !== '-') set.add(st)
     })
-  }, [requests, debouncedSearch, statusFilter, getSerialNumber, getStateName])
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [requests, getStateName])
+
+  // Active filter count for the badge
+  const activeDrawerFilterCount = useMemo(() => {
+    let count = 0
+    if (appliedFilters.fromFormNo.trim()) count++
+    if (appliedFilters.toFormNo.trim()) count++
+    if (appliedFilters.complaintNo.trim()) count++
+    if (appliedFilters.serialNo.trim()) count++
+    if (appliedFilters.epc.trim()) count++
+    if (appliedFilters.item.trim()) count++
+    if (appliedFilters.dateRange && appliedFilters.dateRange[0] && appliedFilters.dateRange[1]) count++
+    if (appliedFilters.state && appliedFilters.state !== 'ALL') count++
+    if (appliedFilters.status && appliedFilters.status !== 'ALL') count++
+    return count
+  }, [appliedFilters])
+
+  // Apply filters via API Call
+  const handleApplyDrawerFilters = () => {
+    setAppliedFilters(drawerFilters)
+    if (drawerFilters.status !== 'ALL') {
+      setStatusFilter(drawerFilters.status)
+    }
+    setIsFilterDrawerOpen(false)
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, debouncedSearch, drawerFilters.status, drawerFilters)
+    message.success('Filters applied successfully')
+  }
+
+  // Reset Drawer Filters
+  const handleResetDrawerFilters = () => {
+    setDrawerFilters(initialFilters)
+    setAppliedFilters(initialFilters)
+    setStatusFilter('ALL')
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, debouncedSearch, 'ALL', initialFilters)
+  }
+
+  // Clear all filters completely
+  const handleClearAllFilters = () => {
+    setSearchQuery('')
+    setDebouncedSearch('')
+    setStatusFilter('ALL')
+    setDrawerFilters(initialFilters)
+    setAppliedFilters(initialFilters)
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, '', 'ALL', initialFilters)
+  }
+
+  // Remove a single active filter tag
+  const handleRemoveTag = (key: keyof DrawerFilterState, defaultVal: any) => {
+    const nextFilters = { ...appliedFilters, [key]: defaultVal }
+    setAppliedFilters(nextFilters)
+    setDrawerFilters(prev => ({ ...prev, [key]: defaultVal }))
+    if (key === 'status') {
+      setStatusFilter('ALL')
+    }
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, debouncedSearch, nextFilters.status, nextFilters)
+  }
+
+  // Toolbar Quick Status Dropdown Handler
+  const handleToolbarStatusChange = (val: string) => {
+    setStatusFilter(val)
+    const nextFilters = { ...appliedFilters, status: val }
+    setAppliedFilters(nextFilters)
+    setDrawerFilters(prev => ({ ...prev, status: val }))
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, debouncedSearch, val, nextFilters)
+  }
+
+  // Metric Cards Click Handler
+  const handleMetricCardClick = (status: string) => {
+    const nextStatus = statusFilter === status && appliedFilters.status === status ? 'ALL' : status
+    setStatusFilter(nextStatus)
+    const nextFilters = { ...appliedFilters, status: nextStatus }
+    setAppliedFilters(nextFilters)
+    setDrawerFilters(prev => ({ ...prev, status: nextStatus }))
+    setPagination(prev => ({ ...prev, page: 1 }))
+    fetchRequests(1, pagination.limit, debouncedSearch, nextStatus, nextFilters)
+  }
 
   // Count summaries for metrics chips
   const metrics = useMemo(() => {
@@ -172,13 +297,8 @@ export default function AdminReplacementDashboard() {
     }
   }, [requests])
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL'
-
-  const resetFilters = () => {
-    setSearchQuery('')
-    setDebouncedSearch('')
-    setStatusFilter('ALL')
-  }
+  const hasAnyFilterActive =
+    searchQuery !== '' || statusFilter !== 'ALL' || activeDrawerFilterCount > 0
 
   // Render Status Badge
   const renderStatus = (status: string) => {
@@ -392,6 +512,22 @@ export default function AdminReplacementDashboard() {
     },
   ]
 
+  const drawerLabelStyle = {
+    fontSize: '11px',
+    fontWeight: 700 as const,
+    color: '#475569',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase' as const,
+    marginBottom: '6px',
+    display: 'block',
+  }
+
+  const drawerInputStyle = {
+    borderRadius: '8px',
+    padding: '7px 11px',
+    fontSize: '13px',
+  }
+
   return (
     <div style={{ padding: '24px', width: '100%' }}>
       {/* Table Style Overrides to ensure header never wraps badly and columns occupy properly */}
@@ -432,7 +568,7 @@ export default function AdminReplacementDashboard() {
         <Tooltip title="Reload latest data">
           <Button
             icon={<ReloadOutlined spin={loading} />}
-            onClick={() => fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter)}
+            onClick={() => fetchRequests(pagination.page, pagination.limit, debouncedSearch, statusFilter, appliedFilters)}
             style={{ borderRadius: '8px' }}
           >
             Refresh
@@ -451,14 +587,14 @@ export default function AdminReplacementDashboard() {
       >
         {/* Total Card */}
         <div
-          onClick={() => setStatusFilter('ALL')}
+          onClick={() => handleMetricCardClick('ALL')}
           style={{
             cursor: 'pointer',
             padding: '14px 18px',
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            border: statusFilter === 'ALL' ? '2px solid #0B63CE' : '1px solid #e2e8f0',
-            boxShadow: statusFilter === 'ALL' ? '0 4px 12px rgba(11, 99, 206, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
+            border: (statusFilter === 'ALL' && appliedFilters.status === 'ALL') ? '2px solid #0B63CE' : '1px solid #e2e8f0',
+            boxShadow: (statusFilter === 'ALL' && appliedFilters.status === 'ALL') ? '0 4px 12px rgba(11, 99, 206, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -490,14 +626,14 @@ export default function AdminReplacementDashboard() {
 
         {/* Submitted Card */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'submitted' ? 'ALL' : 'submitted')}
+          onClick={() => handleMetricCardClick('submitted')}
           style={{
             cursor: 'pointer',
             padding: '14px 18px',
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            border: statusFilter === 'submitted' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-            boxShadow: statusFilter === 'submitted' ? '0 4px 12px rgba(37, 99, 235, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
+            border: (statusFilter === 'submitted' || appliedFilters.status === 'submitted') ? '2px solid #2563eb' : '1px solid #e2e8f0',
+            boxShadow: (statusFilter === 'submitted' || appliedFilters.status === 'submitted') ? '0 4px 12px rgba(37, 99, 235, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -529,14 +665,14 @@ export default function AdminReplacementDashboard() {
 
         {/* Approved Card */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'approved' ? 'ALL' : 'approved')}
+          onClick={() => handleMetricCardClick('approved')}
           style={{
             cursor: 'pointer',
             padding: '14px 18px',
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            border: statusFilter === 'approved' ? '2px solid #10b981' : '1px solid #e2e8f0',
-            boxShadow: statusFilter === 'approved' ? '0 4px 12px rgba(16, 185, 129, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
+            border: (statusFilter === 'approved' || appliedFilters.status === 'approved') ? '2px solid #10b981' : '1px solid #e2e8f0',
+            boxShadow: (statusFilter === 'approved' || appliedFilters.status === 'approved') ? '0 4px 12px rgba(16, 185, 129, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -568,14 +704,14 @@ export default function AdminReplacementDashboard() {
 
         {/* Rejected Card */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'ALL' : 'rejected')}
+          onClick={() => handleMetricCardClick('rejected')}
           style={{
             cursor: 'pointer',
             padding: '14px 18px',
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            border: statusFilter === 'rejected' ? '2px solid #ef4444' : '1px solid #e2e8f0',
-            boxShadow: statusFilter === 'rejected' ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
+            border: (statusFilter === 'rejected' || appliedFilters.status === 'rejected') ? '2px solid #ef4444' : '1px solid #e2e8f0',
+            boxShadow: (statusFilter === 'rejected' || appliedFilters.status === 'rejected') ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 1px 3px rgba(0,0,0,0.03)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -624,31 +760,31 @@ export default function AdminReplacementDashboard() {
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '12px',
-            marginBottom: '18px',
+            marginBottom: '16px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', flex: 1 }}>
             {/* Search Input */}
             <Input
-              placeholder="Search by Form No, Complaint No, Serial No, Customer Name, State..."
+              placeholder="Search by Form No, Complaint No, Serial No, Customer Name..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               allowClear
               style={{
                 width: '100%',
-                maxWidth: '400px',
+                maxWidth: '380px',
                 borderRadius: '8px',
                 paddingTop: '6px',
                 paddingBottom: '6px',
               }}
             />
 
-            {/* Status Filter */}
+            {/* Quick Status Filter Dropdown */}
             <Select
               value={statusFilter}
-              onChange={val => setStatusFilter(val)}
-              style={{ width: 160 }}
+              onChange={handleToolbarStatusChange}
+              style={{ width: 150 }}
               options={[
                 { value: 'ALL', label: 'All Statuses' },
                 { value: 'submitted', label: 'Submitted' },
@@ -658,11 +794,37 @@ export default function AdminReplacementDashboard() {
               ]}
             />
 
-            {/* Reset Filters button */}
-            {hasActiveFilters && (
+            {/* Side Drawer Filters Button */}
+            <Tooltip title="Filters">
+              <Badge count={activeDrawerFilterCount} offset={[-2, 2]} color="#0B63CE">
+                <Button
+                  icon={<FilterOutlined style={{ color: activeDrawerFilterCount > 0 ? '#0B63CE' : '#475569' }} />}
+                  onClick={() => {
+                    setDrawerFilters(appliedFilters)
+                    setIsFilterDrawerOpen(true)
+                  }}
+                  style={{
+                    borderRadius: '8px',
+                    height: '36px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 500,
+                    borderColor: activeDrawerFilterCount > 0 ? '#0B63CE' : '#cbd5e1',
+                    backgroundColor: activeDrawerFilterCount > 0 ? '#eff6ff' : '#ffffff',
+                    color: activeDrawerFilterCount > 0 ? '#0B63CE' : '#334155',
+                  }}
+                >
+                  Filters
+                </Button>
+              </Badge>
+            </Tooltip>
+
+            {/* Clear All Filters Button */}
+            {hasAnyFilterActive && (
               <Button
                 icon={<ClearOutlined />}
-                onClick={resetFilters}
+                onClick={handleClearAllFilters}
                 style={{ borderRadius: '8px', color: '#64748b' }}
               >
                 Clear Filters
@@ -672,16 +834,88 @@ export default function AdminReplacementDashboard() {
 
           {/* Records Counter */}
           <div style={{ color: '#64748b', fontSize: '13px' }}>
-            Showing <strong style={{ color: '#0f172a' }}>{filteredRequests.length}</strong> of{' '}
+            Showing <strong style={{ color: '#0f172a' }}>{requests.length}</strong> of{' '}
             <strong style={{ color: '#0f172a' }}>{pagination.total || requests.length}</strong> requests
           </div>
         </div>
+
+        {/* Active Filter Tags Bar (shows all active filters applied via Drawer) */}
+        {activeDrawerFilterCount > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '8px',
+              padding: '10px 14px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              marginBottom: '16px',
+            }}
+          >
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Active Filters:</span>
+            {appliedFilters.fromFormNo && (
+              <Tag closable onClose={() => handleRemoveTag('fromFormNo', '')} color="blue">
+                From Form: {appliedFilters.fromFormNo}
+              </Tag>
+            )}
+            {appliedFilters.toFormNo && (
+              <Tag closable onClose={() => handleRemoveTag('toFormNo', '')} color="blue">
+                To Form: {appliedFilters.toFormNo}
+              </Tag>
+            )}
+            {appliedFilters.complaintNo && (
+              <Tag closable onClose={() => handleRemoveTag('complaintNo', '')} color="cyan">
+                Complaint: {appliedFilters.complaintNo}
+              </Tag>
+            )}
+            {appliedFilters.serialNo && (
+              <Tag closable onClose={() => handleRemoveTag('serialNo', '')} color="purple">
+                Serial No: {appliedFilters.serialNo}
+              </Tag>
+            )}
+            {appliedFilters.epc && (
+              <Tag closable onClose={() => handleRemoveTag('epc', '')} color="geekblue">
+                EPC: {appliedFilters.epc}
+              </Tag>
+            )}
+            {appliedFilters.item && (
+              <Tag closable onClose={() => handleRemoveTag('item', '')} color="magenta">
+                Item: {appliedFilters.item}
+              </Tag>
+            )}
+            {appliedFilters.state !== 'ALL' && (
+              <Tag closable onClose={() => handleRemoveTag('state', 'ALL')} color="orange">
+                State: {appliedFilters.state}
+              </Tag>
+            )}
+            {appliedFilters.dateRange && (
+              <Tag closable onClose={() => handleRemoveTag('dateRange', null)} color="gold">
+                Date: {appliedFilters.dateRange[0]?.format('DD/MM/YYYY')} - {appliedFilters.dateRange[1]?.format('DD/MM/YYYY')}
+              </Tag>
+            )}
+            {appliedFilters.status !== 'ALL' && (
+              <Tag closable onClose={() => handleRemoveTag('status', 'ALL')} color="green">
+                Status: {appliedFilters.status.toUpperCase()}
+              </Tag>
+            )}
+            <Button
+              type="link"
+              size="small"
+              onClick={handleResetDrawerFilters}
+              style={{ padding: 0, fontSize: '12px', color: '#ef4444' }}
+            >
+              Reset All
+            </Button>
+          </div>
+        )}
 
         {/* Table */}
         <Table
           className="replacement-table"
           columns={columns}
-          dataSource={filteredRequests}
+          dataSource={requests}
           rowKey="id"
           loading={loading}
           locale={{
@@ -689,16 +923,16 @@ export default function AdminReplacementDashboard() {
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                  hasActiveFilters ? (
+                  hasAnyFilterActive ? (
                     <div>
-                      <p style={{ margin: 0, color: '#64748b' }}>No replacement forms match your search</p>
+                      <p style={{ margin: 0, color: '#64748b' }}>No replacement forms match your filter criteria</p>
                       <Button
                         type="link"
                         size="small"
-                        onClick={resetFilters}
+                        onClick={handleClearAllFilters}
                         style={{ padding: 0, marginTop: '4px' }}
                       >
-                        Reset Filters
+                        Reset All Filters
                       </Button>
                     </div>
                   ) : (
@@ -717,11 +951,184 @@ export default function AdminReplacementDashboard() {
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} forms`,
             onChange: (page, pageSize) => {
               setPagination(prev => ({ ...prev, page, limit: pageSize }))
+              fetchRequests(page, pageSize, debouncedSearch, statusFilter, appliedFilters)
             },
           }}
           scroll={{ x: 'max-content' }}
         />
       </Card>
+
+      {/* FILTER DRAWER */}
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FilterOutlined style={{ color: '#0B63CE', fontSize: '18px' }} />
+            <span style={{ fontWeight: 700, fontSize: '16px', color: '#0f172a' }}>
+              Filter Complaints Report
+            </span>
+          </div>
+        }
+        placement="right"
+        width={380}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        open={isFilterDrawerOpen}
+        closeIcon={<CloseOutlined style={{ fontSize: '15px', color: '#64748b' }} />}
+        styles={{
+          body: { padding: '20px', paddingBottom: '80px' },
+          footer: { padding: '16px 20px', borderTop: '1px solid #f1f5f9' },
+        }}
+        footer={
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', width: '100%' }}>
+            <Button
+              onClick={handleResetDrawerFilters}
+              style={{
+                borderRadius: '8px',
+                fontWeight: 600,
+                height: '38px',
+                padding: '0 20px',
+                color: '#64748b',
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleApplyDrawerFilters}
+              style={{
+                backgroundColor: '#0B63CE',
+                borderRadius: '8px',
+                fontWeight: 600,
+                height: '38px',
+                padding: '0 24px',
+                boxShadow: '0 2px 4px rgba(11, 99, 206, 0.25)',
+              }}
+            >
+              Apply Filters
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* FROM DOC NO. & TO DOC NO. */}
+          <div>
+            <Row gutter={12}>
+              <Col span={12}>
+                <label style={drawerLabelStyle}>From Doc No.</label>
+                <Input
+                  placeholder="Search from..."
+                  value={drawerFilters.fromFormNo}
+                  onChange={e => setDrawerFilters({ ...drawerFilters, fromFormNo: e.target.value })}
+                  allowClear
+                  style={drawerInputStyle}
+                />
+              </Col>
+              <Col span={12}>
+                <label style={drawerLabelStyle}>To Doc No.</label>
+                <Input
+                  placeholder="Search to..."
+                  value={drawerFilters.toFormNo}
+                  onChange={e => setDrawerFilters({ ...drawerFilters, toFormNo: e.target.value })}
+                  allowClear
+                  style={drawerInputStyle}
+                />
+              </Col>
+            </Row>
+          </div>
+
+          {/* SERIAL NO. */}
+          <div>
+            <label style={drawerLabelStyle}>Serial No.</label>
+            <Input
+              placeholder="Search serial no..."
+              value={drawerFilters.serialNo}
+              onChange={e => setDrawerFilters({ ...drawerFilters, serialNo: e.target.value })}
+              allowClear
+              style={drawerInputStyle}
+            />
+          </div>
+
+          {/* EPC */}
+          <div>
+            <label style={drawerLabelStyle}>EPC</label>
+            <Input
+              placeholder="Search EPC..."
+              value={drawerFilters.epc}
+              onChange={e => setDrawerFilters({ ...drawerFilters, epc: e.target.value })}
+              allowClear
+              style={drawerInputStyle}
+            />
+          </div>
+
+          {/* DATE RANGE */}
+          <div>
+            <label style={drawerLabelStyle}>Date Range</label>
+            <DatePicker.RangePicker
+              value={drawerFilters.dateRange}
+              onChange={val => setDrawerFilters({ ...drawerFilters, dateRange: val })}
+              format="DD/MM/YYYY"
+              placeholder={['Start date', 'End date']}
+              style={{ width: '100%', borderRadius: '8px', padding: '7px 11px' }}
+            />
+          </div>
+
+          {/* ITEM */}
+          <div>
+            <label style={drawerLabelStyle}>Item</label>
+            <Input
+              placeholder="Search item..."
+              value={drawerFilters.item}
+              onChange={e => setDrawerFilters({ ...drawerFilters, item: e.target.value })}
+              allowClear
+              style={drawerInputStyle}
+            />
+          </div>
+
+          {/* COMPLAINT NO. */}
+          <div>
+            <label style={drawerLabelStyle}>Complaint No.</label>
+            <Input
+              placeholder="Search complaint no..."
+              value={drawerFilters.complaintNo}
+              onChange={e => setDrawerFilters({ ...drawerFilters, complaintNo: e.target.value })}
+              allowClear
+              style={drawerInputStyle}
+            />
+          </div>
+
+          {/* COMPLAINT STATUS */}
+          <div>
+            <label style={drawerLabelStyle}>Complaint Status</label>
+            <Select
+              value={drawerFilters.status}
+              onChange={val => setDrawerFilters({ ...drawerFilters, status: val })}
+              style={{ width: '100%' }}
+              options={[
+                { value: 'ALL', label: 'All Status' },
+                { value: 'submitted', label: 'Submitted' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'draft', label: 'Draft' },
+              ]}
+            />
+          </div>
+
+          {/* STATE */}
+          <div>
+            <label style={drawerLabelStyle}>State</label>
+            <Select
+              value={drawerFilters.state}
+              onChange={val => setDrawerFilters({ ...drawerFilters, state: val })}
+              showSearch
+              placeholder="Select states..."
+              style={{ width: '100%' }}
+              options={[
+                { value: 'ALL', label: 'All States' },
+                ...stateOptions.map(st => ({ value: st, label: st })),
+              ]}
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   )
 }
