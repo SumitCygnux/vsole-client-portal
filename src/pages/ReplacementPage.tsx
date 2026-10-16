@@ -17,7 +17,7 @@ type Complaint = {
   capacity: string
   product_name?: string
   serialNo: string
-  phase: string
+  phase?: string
   status: 'open' | 'closed'
   company_id?: string
   location_id?: string
@@ -431,7 +431,6 @@ function ReplacementPage() {
         capacity: capacityRight === false ? correctCapacity : (selectedComplaint?.product_name || selectedComplaint?.capacity),
         product_name: capacityRight === false ? correctCapacity : (selectedComplaint?.product_name || selectedComplaint?.capacity),
         serial_no: serialNoRight === false ? correctSerialNo : selectedComplaint?.serialNo,
-        phase: selectedComplaint?.phase,
         capacity_right: capacityRight,
         serial_no_right: serialNoRight,
         epc_name: epcName,
@@ -591,32 +590,6 @@ function ReplacementPage() {
             <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <ReadOnlyField label="Product Name" value={selectedComplaint?.product_name || selectedComplaint?.capacity || 'N/A'} />
               <ReadOnlyField label="Serial no" value={selectedComplaint?.serialNo || 'N/A'} />
-              <ReadOnlyField label="Phase" value={selectedComplaint?.phase || 'N/A'} />
-              <FormInput
-                label="Client contact no"
-                required
-                value={clientContactNo}
-                onChange={(val) => {
-                  const raw = val.replace(/\D/g, '')
-                  let formatted = ''
-                  for (let i = 0; i < raw.length; i++) {
-                    const char = raw[i]
-                    if (i === 0) {
-                      if (/[6-9]/.test(char)) formatted += char
-                    } else {
-                      formatted += char
-                    }
-                  }
-                  setClientContactNo(formatted)
-                }}
-                error={errors.clientContactNo}
-                maxLength={10}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1 items-start">
-              <ToggleField label="Product Name right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
-              <ToggleField label="Serial no right?" value={serialNoRight} onChange={setSerialNoRight} error={errors.serialNoRight} />
               <FormInput label="EPC name" required value={epcName} onChange={setEpcName} error={errors.epcName} />
               <div>
                 <FieldLabel label="EPC GST no" required />
@@ -661,58 +634,29 @@ function ReplacementPage() {
               </div>
             </div>
 
-            {/* Conditional inputs if toggles are false */}
-            {(capacityRight === false || serialNoRight === false) && (
-              <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                {capacityRight === false ? <FormInput label="Correct Product Name" required value={correctCapacity} onChange={setCorrectCapacity} error={errors.correctCapacity} /> : <div />}
-                {serialNoRight === false ? <FormInput label="Correct Serial No" required value={correctSerialNo} onChange={setCorrectSerialNo} error={errors.correctSerialNo} /> : <div />}
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <div>
-                <FieldLabel label="Pincode" required />
-                <Select
-                  showSearch
-                  placeholder="Pincode"
-                  className="w-full h-10 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!bg-[#F9FAFB] hover:[&_.ant-select-selector]:!border-gray-400 [&_.ant-select-selector]:!border-gray-300 [&_.ant-select-selector]:!h-10 [&_.ant-select-selection-item]:!leading-[38px] text-[13px]"
-                  value={pincodeId || undefined}
-                  onChange={(val) => {
-                    const pin = pincodes.find(p => p.id === val)
-                    if (pin) {
-                      setPincodeId(pin.id)
-                      setPincode(String(pin.pinCode || pin.pin_name || ''))
-                      setSelectedPin(pin)
+            <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1 items-start">
+              <ToggleField label="Product Name right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
+              <ToggleField label="Serial no right?" value={serialNoRight} onChange={setSerialNoRight} error={errors.serialNoRight} />
+              <FormInput
+                label="Client contact no"
+                required
+                value={clientContactNo}
+                onChange={(val) => {
+                  const raw = val.replace(/\D/g, '')
+                  let formatted = ''
+                  for (let i = 0; i < raw.length; i++) {
+                    const char = raw[i]
+                    if (i === 0) {
+                      if (/[6-9]/.test(char)) formatted += char
+                    } else {
+                      formatted += char
                     }
-                  }}
-                  onInputKeyDown={(e) => {
-                    const key = e.key
-                    if (
-                      !/^[0-9]$/.test(key) &&
-                      key !== 'Backspace' &&
-                      key !== 'Delete' &&
-                      key !== 'ArrowLeft' &&
-                      key !== 'ArrowRight' &&
-                      key !== 'Tab' &&
-                      key !== 'Enter'
-                    ) {
-                      e.preventDefault()
-                    }
-                  }}
-                  onSearch={(val) => {
-                    const digits = val.replace(/\D/g, '')
-                    handlePincodeSearch(digits)
-                  }}
-                  onPopupScroll={handlePincodePopupScroll}
-                  filterOption={false}
-                  loading={fetchingPincodes}
-                  status={errors.pincode ? 'error' : undefined}
-                  options={pincodeOptions}
-                />
-                {fieldError('pincode')}
-              </div>
-              <ReadOnlyField label="City" value={city || ''} />
-              <ReadOnlyField label="State" value={state || ''} />
+                  }
+                  setClientContactNo(formatted)
+                }}
+                error={errors.clientContactNo}
+                maxLength={10}
+              />
               <div>
                 <div className="block text-[12px] font-medium mb-1 h-[18px]"></div>
                 <div className="h-10 flex items-center">
@@ -733,7 +677,15 @@ function ReplacementPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            {/* Conditional inputs if toggles are false */}
+            {(capacityRight === false || serialNoRight === false) && (
+              <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                {capacityRight === false ? <FormInput label="Correct Product Name" required value={correctCapacity} onChange={setCorrectCapacity} error={errors.correctCapacity} /> : <div />}
+                {serialNoRight === false ? <FormInput label="Correct Serial No" required value={correctSerialNo} onChange={setCorrectSerialNo} error={errors.correctSerialNo} /> : <div />}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-6 max-sm:grid-cols-1">
               <FormInput
                 label="Receiver name"
                 required
@@ -779,6 +731,52 @@ function ReplacementPage() {
                 error={errors.receiverContactNumber}
                 placeholder="Enter 10-digit contact number"
               />
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+              <div>
+                <FieldLabel label="Pincode" required />
+                <Select
+                  showSearch
+                  placeholder="Pincode"
+                  className="w-full h-10 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!bg-[#F9FAFB] hover:[&_.ant-select-selector]:!border-gray-400 [&_.ant-select-selector]:!border-gray-300 [&_.ant-select-selector]:!h-10 [&_.ant-select-selection-item]:!leading-[38px] text-[13px]"
+                  value={pincodeId || undefined}
+                  onChange={(val) => {
+                    const pin = pincodes.find(p => p.id === val)
+                    if (pin) {
+                      setPincodeId(pin.id)
+                      setPincode(String(pin.pinCode || pin.pin_name || ''))
+                      setSelectedPin(pin)
+                    }
+                  }}
+                  onInputKeyDown={(e) => {
+                    const key = e.key
+                    if (
+                      !/^[0-9]$/.test(key) &&
+                      key !== 'Backspace' &&
+                      key !== 'Delete' &&
+                      key !== 'ArrowLeft' &&
+                      key !== 'ArrowRight' &&
+                      key !== 'Tab' &&
+                      key !== 'Enter'
+                    ) {
+                      e.preventDefault()
+                    }
+                  }}
+                  onSearch={(val) => {
+                    const digits = val.replace(/\D/g, '')
+                    handlePincodeSearch(digits)
+                  }}
+                  onPopupScroll={handlePincodePopupScroll}
+                  filterOption={false}
+                  loading={fetchingPincodes}
+                  status={errors.pincode ? 'error' : undefined}
+                  options={pincodeOptions}
+                />
+                {fieldError('pincode')}
+              </div>
+              <ReadOnlyField label="City" value={city || ''} />
+              <ReadOnlyField label="State" value={state || ''} />
             </div>
 
             <div>

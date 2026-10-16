@@ -16,9 +16,14 @@ axiosApi.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Pass the default tenant_id for all requests
+    // Pass the default tenant_id for requests if configured and valid
     config.params = config.params || {};
-    config.params.tenant_id = import.meta.env.VITE_TENANT_ID || '-';
+    const tenantId = import.meta.env.VITE_TENANT_ID;
+    if (tenantId && tenantId !== '-' && tenantId !== 'undefined' && tenantId !== 'null') {
+      config.params.tenant_id = tenantId;
+    } else if (config.params.tenant_id === '-') {
+      delete config.params.tenant_id;
+    }
     
     return config;
   },
