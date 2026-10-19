@@ -4,12 +4,19 @@ import { Input, Select, message, Checkbox } from 'antd'
 import dayjs from 'dayjs'
 import axios from 'axios'
 
-import { get, post } from '@/helpers/api_helper'
-import { CREATE_REPLACEMENT_DETAIL, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN, GET_COMPLAINTS } from '@/helpers/url_helper'
-import { useSearchParams } from 'react-router-dom'
+import { get, post, patch } from '@/helpers/api_helper'
+import { CREATE_REPLACEMENT_DETAIL, UPDATE_REPLACEMENT_DETAIL, GET_REPLACEMENT_DETAILS, GET_COMPLAINT_BY_NO, GET_PIN_DROPDOWN, GET_COMPLAINTS } from '@/helpers/url_helper'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { ROUTES } from '@/constants/app'
 import { Button } from '@/components/ui/Button'
 
 const { TextArea } = Input
+
+export const FORM_TYPE_OPTIONS = [
+  { value: 'replacement', label: 'Replacement' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'replacement_test', label: 'Replacement Test' },
+]
 
 type Complaint = {
   id: string
@@ -27,8 +34,13 @@ type Complaint = {
 type FormErrors = Record<string, string>
 
 function ReplacementPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const complaintQuery = searchParams.get('complaint_no')
+  const idQuery = searchParams.get('id')
+  const isEditMode = !!idQuery
+  const [loadingRecord, setLoadingRecord] = useState(false)
+  const [recordStatus, setRecordStatus] = useState<string>('')
 
   const [formDate] = useState(() => dayjs())
 
@@ -253,7 +265,7 @@ function ReplacementPage() {
       const complaint = res.data
 
       if (complaint) {
-        if (complaint.is_form_fill) {
+        if (!isEditMode && complaint.is_form_fill) {
           setSelectedComplaint(null)
           setComplaintError('A replacement request has already been submitted for this complaint.')
           return
@@ -327,6 +339,89 @@ function ReplacementPage() {
       handleSelectComplaint(complaintQuery)
     }
   }, [complaintQuery])
+
+  useEffect(() => {
+    if (idQuery) {
+      const fetchRecord = async () => {
+        setLoadingRecord(true)
+        try {
+          const res = await get(`${GET_REPLACEMENT_DETAILS}/${idQuery}`)
+          const record = res.data
+          if (record) {
+            const rawStatus = String(record.status || '').trim().toLowerCase()
+            setRecordStatus(rawStatus)
+            if (rawStatus === 'approved') {
+              message.warning('Approved replacement requests cannot be edited.')
+              const userRole = localStorage.getItem('customerRole') || 'customer'
+              if (userRole === 'admin') {
+                navigate(ROUTES.ADMIN_REPLACEMENT_REQUESTS)
+              } else {
+                navigate(ROUTES.MY_REPLACEMENTS)
+              }
+              return
+            }
+
+            if (record.type_of_form) {
+              setTypeOfForm(record.type_of_form.toLowerCase())
+            }
+
+            const compNo = record.complaint_number || record.complaint_no || record.complaint?.complaint_no || ''
+            setComplaintSearch(compNo)
+            lastVerifiedRef.current = compNo
+
+            const resolvedProd = record.product_name || record.capacity || record.complaint?.product_name || '-'
+            setSelectedComplaint({
+              id: record.complaint_id || record.complaint?.id,
+              complaint_no: compNo,
+              capacity: resolvedProd,
+              product_name: resolvedProd,
+              serialNo: record.serial_no || record.complaint?.serial_number || '-',
+              phase: record.phase && record.phase !== '-' ? (record.phase.toLowerCase().includes('phase') ? record.phase : `${record.phase}-Phase`) : '1-Phase',
+              status: record.complaint?.status || 'open',
+              company_id: record.company_id,
+              location_id: record.location_id,
+              fin_year: record.fin_year
+            })
+
+            setCapacityRight(record.capacity_right !== false)
+            setSerialNoRight(record.serial_no_right !== false)
+            if (record.capacity_right === false) {
+              setCorrectCapacity(record.capacity || '')
+            }
+            if (record.serial_no_right === false) {
+              setCorrectSerialNo(record.serial_no || '')
+            }
+
+            setEpcName(record.epc_name || '')
+            setEpcGstNo(record.epc_gst_no || '')
+            setDispatchAddress(record.dispatch_address || '')
+            setPincode(record.pincode || '')
+            setPincodeId(record.pincode_id || null)
+            setClientContactNo(record.client_contact_no || '')
+            setReceiverName(record.receiver_name || record.reciever_name || '')
+            setReceiverContactNumber(record.receiver_contact_no || record.reciever_contact_no || '')
+
+            if (record.pincode) {
+              handlePincodeSearch(record.pincode)
+            }
+            if (record.state || record.city) {
+              setSelectedPin({
+                state_id: { name: record.state, state_name: record.state },
+                city_id: { name: record.city, city_name: record.city },
+                id: record.pincode_id
+              })
+            }
+          }
+        } catch (error: any) {
+          console.error(error)
+          message.error(error?.response?.data?.message || 'Failed to load replacement details')
+        } finally {
+          setLoadingRecord(false)
+        }
+      }
+      fetchRecord()
+    }
+  }, [idQuery])
 
   useEffect(() => {
     if (!localStorage.getItem('authToken')) {
@@ -454,9 +549,24 @@ function ReplacementPage() {
         fin_year: selectedComplaint?.fin_year,
       }
 
-      await post(CREATE_REPLACEMENT_DETAIL, payload)
-      message.success('Replacement form submitted successfully.')
-      resetForm()
+      if (idQuery) {
+        if (recordStatus === 'approved') {
+          message.error('Approved replacement requests cannot be edited.')
+          return
+        }
+        await patch(`${UPDATE_REPLACEMENT_DETAIL}/${idQuery}`, payload)
+        message.success('Replacement form updated successfully.')
+        const userRole = localStorage.getItem('customerRole') || 'customer'
+        if (userRole === 'admin') {
+          navigate(ROUTES.ADMIN_REPLACEMENT_REQUESTS)
+        } else {
+          navigate(ROUTES.MY_REPLACEMENTS)
+        }
+      } else {
+        await post(CREATE_REPLACEMENT_DETAIL, payload)
+        message.success('Replacement form submitted successfully.')
+        resetForm()
+      }
     } catch (error: any) {
       console.error('Failed to submit form:', error)
       const errorMsg = error?.response?.data?.message || 'Failed to submit replacement form. Please try again.'
@@ -477,7 +587,7 @@ function ReplacementPage() {
     <div className="replacement-page bg-[#F1F3FC] min-h-[calc(100vh-72px)] p-6 max-sm:p-4 pb-24 max-sm:pb-20 text-[#374151] font-sans flex flex-col">
       <div className="mx-auto w-full max-w-[1400px] flex flex-col gap-6 flex-1">
         <div className="flex items-center justify-between">
-          <h1 className="text-[22px] font-bold text-[#111827] m-0">Replacement Form</h1>
+          <h1 className="text-[22px] font-bold text-[#111827] m-0">{isEditMode ? 'Edit Replacement Form' : 'Replacement Form'}</h1>
 
           <div className="flex items-start gap-3">
             <div className="flex flex-col items-center text-center bg-white border border-gray-200 rounded-[6px] px-4 py-2 min-w-[140px] shadow-sm h-[60px] justify-center">
@@ -485,9 +595,22 @@ function ReplacementPage() {
               <span className="text-[13px] font-semibold text-gray-800">{formDate.format('DD MMM YYYY')}</span>
             </div>
 
-            <div className="flex flex-col items-center text-center bg-white border border-gray-200 rounded-[6px] px-4 py-2 min-w-[140px] shadow-sm h-[60px] justify-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TYPE OF FORM</span>
-              <span className="text-[13px] font-semibold text-gray-800">Replacement</span>
+            <div className={`flex flex-col items-center text-center bg-white border rounded-[6px] px-3 py-1.5 min-w-[160px] shadow-sm h-[60px] justify-center ${errors.typeOfForm ? 'border-red-400' : 'border-gray-200'}`}>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">TYPE OF FORM</span>
+              <Select
+                variant="borderless"
+                className="w-full text-center [&_.ant-select-selector]:!p-0 [&_.ant-select-selection-item]:!font-semibold [&_.ant-select-selection-item]:!text-gray-800 [&_.ant-select-selection-item]:!text-[13px] [&_.ant-select-selection-search-input]:!text-center"
+                value={typeOfForm ? typeOfForm.toLowerCase() : 'replacement'}
+                onChange={(val) => {
+                  setTypeOfForm(val)
+                  setErrors((prev) => {
+                    const next = { ...prev }
+                    delete next.typeOfForm
+                    return next
+                  })
+                }}
+                options={FORM_TYPE_OPTIONS}
+              />
             </div>
 
             <div className="flex flex-col gap-1 min-w-[220px] max-w-[280px]">
@@ -541,7 +664,7 @@ function ReplacementPage() {
                       filterOption={false}
                       options={complaintOptions}
                       loading={fetchingComplaints || verifying}
-                      disabled={!!complaintQuery}
+                      disabled={!!complaintQuery || isEditMode}
                     />
                   ) : (
                     <Input
@@ -550,11 +673,11 @@ function ReplacementPage() {
                       placeholder="Enter complaint number"
                       value={complaintSearch}
                       onChange={(e) => setComplaintSearch(e.target.value)}
-                      disabled={!!complaintQuery}
+                      disabled={!!complaintQuery || isEditMode}
                     />
                   )}
 
-                  {complaintSearch && !complaintQuery && (
+                  {complaintSearch && !complaintQuery && !isEditMode && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -813,10 +936,10 @@ function ReplacementPage() {
             buttonVariant="primary"
             isLoading={submitting}
             onClick={handleSubmit}
-            disabled={!selectedComplaint || !!complaintError}
+            disabled={!selectedComplaint || !!complaintError || loadingRecord}
             className="!h-10 !rounded-lg !border-0 !bg-[#5C6BC0] !px-8 !font-semibold !text-white hover:!bg-[#4F5B93] disabled:!bg-[#9CA3AF] disabled:!cursor-not-allowed disabled:!opacity-70"
           >
-            Submit Form
+            {isEditMode ? (submitting ? 'Updating...' : 'Update Form') : (submitting ? 'Submitting...' : 'Submit Form')}
           </Button>
         </div>
       </div>

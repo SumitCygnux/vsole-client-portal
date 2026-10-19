@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Typography, Tag, Button, message, Spin, Row, Col, Divider, Modal, Input } from 'antd'
-import { CheckCircleOutlined, ArrowLeftOutlined, SettingOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, ArrowLeftOutlined, SettingOutlined, CloseCircleOutlined, EditOutlined } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { get, patch } from '@/helpers/api_helper'
 import { GET_REPLACEMENT_DETAILS, UPDATE_REPLACEMENT_STATUS } from '@/helpers/url_helper'
@@ -121,9 +121,20 @@ export default function AdminReplacementDashboardDetails() {
             <Text style={{ color: '#6b7280', fontSize: '14px' }}>Form No: {request.form_no}</Text>
           </div>
         </div>
-        <Tag color={getStatusColor(request.status)} style={{ fontSize: '14px', padding: '6px 16px', borderRadius: '20px', fontWeight: 600, border: 'none' }}>
-          {request.status ? request.status.toUpperCase() : 'DRAFT'}
-        </Tag>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {String(request.status || '').trim().toLowerCase() !== 'approved' && (
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => navigate(`${ROUTES.ADMIN_REPLACEMENT_FORM}?id=${request.id}`)}
+              style={{ fontWeight: 500 }}
+            >
+              Edit Form
+            </Button>
+          )}
+          <Tag color={getStatusColor(request.status)} style={{ fontSize: '14px', padding: '6px 16px', borderRadius: '20px', fontWeight: 600, border: 'none' }}>
+            {request.status ? request.status.toUpperCase() : 'DRAFT'}
+          </Tag>
+        </div>
       </div>
 
       {/* Details Area */}
