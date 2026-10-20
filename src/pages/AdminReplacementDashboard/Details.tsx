@@ -169,12 +169,6 @@ export default function AdminReplacementDashboardDetails() {
               </Col>
               <Col span={24}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Phase</Text>
-                  <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500 }}>{request.phase || 'N/A'}</Text>
-                </div>
-              </Col>
-              <Col span={24}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <Text style={{ color: '#6b7280', fontSize: '13px', marginBottom: '4px' }}>Type of Form</Text>
                   <Text style={{ color: '#111827', fontSize: '15px', fontWeight: 500, textTransform: 'capitalize' }}>{request.type_of_form || 'Replacement'}</Text>
                 </div>
