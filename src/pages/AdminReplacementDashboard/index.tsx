@@ -16,9 +16,11 @@ import {
   Col,
   Badge,
   Tag,
+  Dropdown,
 } from 'antd'
 import {
   EyeOutlined,
+  EditOutlined,
   SearchOutlined,
   ReloadOutlined,
   ClearOutlined,
@@ -29,6 +31,7 @@ import {
   CloseCircleOutlined,
   FilterOutlined,
   CloseOutlined,
+  MoreOutlined,
 } from '@ant-design/icons'
 import { get } from '@/helpers/api_helper'
 import {
@@ -600,25 +603,57 @@ export default function AdminReplacementDashboard() {
       key: 'action',
       width: 90,
       align: 'center' as const,
-      render: (_: any, record: any) => (
-        <Button
-          type="primary"
-          icon={<EyeOutlined />}
-          size="small"
-          style={{
-            borderRadius: '6px',
-            backgroundColor: '#0B63CE',
-            boxShadow: '0 2px 4px rgba(11, 99, 206, 0.2)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            fontWeight: 500,
-          }}
-          onClick={() => handleView(record)}
-        >
-          View
-        </Button>
-      ),
+      render: (_: any, record: any) => {
+        const isApproved = String(record.status || '').trim().toLowerCase() === 'approved'
+
+        const menuItems = [
+          {
+            key: 'view',
+            label: <span style={{ fontWeight: 500, fontSize: '13px' }}>View</span>,
+            icon: <EyeOutlined style={{ color: '#0B63CE', fontSize: '14px' }} />,
+            onClick: () => handleView(record),
+          },
+          ...(!isApproved
+            ? [
+                {
+                  key: 'edit',
+                  label: <span style={{ fontWeight: 500, fontSize: '13px' }}>Edit</span>,
+                  icon: <EditOutlined style={{ color: '#0d9488', fontSize: '14px' }} />,
+                  onClick: () => navigate(`${ROUTES.ADMIN_REPLACEMENT_FORM}?id=${record.id}`),
+                },
+              ]
+            : []),
+        ]
+
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <Dropdown
+              menu={{ items: menuItems }}
+              trigger={['click']}
+              placement="bottomRight"
+            >
+              <Button
+                type="text"
+                size="small"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                }}
+                icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+              />
+            </Dropdown>
+          </div>
+        )
+      },
     },
   ]
 
