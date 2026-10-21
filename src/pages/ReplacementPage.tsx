@@ -225,21 +225,40 @@ function ReplacementPage() {
 
         if (tradeNam || lgnm) {
           setEpcName(tradeNam || lgnm)
+          setErrors(prev => {
+            const next = { ...prev }
+            delete next.epcName
+            return next
+          })
         }
         if (fullAddress.trim()) {
           setDispatchAddress(fullAddress.trim())
+          setErrors(prev => {
+            const next = { ...prev }
+            delete next.dispatchAddress
+            return next
+          })
         }
         if (addr?.pncd) {
           setPincode(addr.pncd)
           handlePincodeSearch(addr.pncd)
+          setErrors(prev => {
+            const next = { ...prev }
+            delete next.pincode
+            return next
+          })
         }
         message.success("GST verified and details autofilled")
       } else {
         const msg = res.data?.message || res.data?.response?.error || "GST verification failed"
-        message.error(msg)
+        message.warning(msg)
       }
     } catch (e: any) {
-      message.error(e?.message || "GST verification failed")
+      if (e?.response?.status === 401 || e?.message?.includes('401')) {
+        message.warning("GST verification service is currently unavailable. Please verify details manually.")
+      } else {
+        message.warning(e?.response?.data?.message || e?.message || "GST verification failed")
+      }
     } finally {
       setGstVerifyLoading(false)
     }
@@ -447,9 +466,10 @@ function ReplacementPage() {
     if (capacityRight === false && !correctCapacity.trim()) newErrors.correctCapacity = 'Correct product name is required'
     if (serialNoRight === false && !correctSerialNo.trim()) newErrors.correctSerialNo = 'Correct serial number is required'
     if (!epcName.trim()) newErrors.epcName = 'EPC name is required'
-    if (!epcGstNo.trim()) {
+    const cleanGst = epcGstNo.trim().toUpperCase()
+    if (!cleanGst) {
       newErrors.epcGstNo = 'GST number is required'
-    } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/.test(epcGstNo)) {
+    } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z0-9A-Z]{1}[0-9A-Z]{1}$/.test(cleanGst)) {
       newErrors.epcGstNo = 'Invalid GST format (e.g. 22AAAAA0000A1Z5)'
     }
     if (!receiverName.trim()) newErrors.receiverName = 'Receiver name is required'
@@ -528,8 +548,8 @@ function ReplacementPage() {
         serial_no: serialNoRight === false ? correctSerialNo : selectedComplaint?.serialNo,
         capacity_right: capacityRight,
         serial_no_right: serialNoRight,
-        epc_name: epcName,
-        epc_gst_no: epcGstNo,
+        epc_name: epcName.trim(),
+        epc_gst_no: epcGstNo.trim().toUpperCase(),
         dispatch_address: dispatchAddress,
         pincode,
         pincode_id: pincodeId,
@@ -713,7 +733,22 @@ function ReplacementPage() {
             <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <ReadOnlyField label="Product Name" value={selectedComplaint?.product_name || selectedComplaint?.capacity || 'N/A'} />
               <ReadOnlyField label="Serial no" value={selectedComplaint?.serialNo || 'N/A'} />
-              <FormInput label="EPC name" required value={epcName} onChange={setEpcName} error={errors.epcName} />
+              <FormInput
+                label="EPC name"
+                required
+                value={epcName}
+                onChange={(val) => {
+                  setEpcName(val)
+                  if (errors.epcName) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.epcName
+                      return next
+                    })
+                  }
+                }}
+                error={errors.epcName}
+              />
               <div>
                 <FieldLabel label="EPC GST no" required />
                 <Input
@@ -721,30 +756,17 @@ function ReplacementPage() {
                   required
                   value={epcGstNo}
                   onChange={(e) => {
-                    const val = e.target.value
-                    const raw = val.toUpperCase().replace(/[^A-Z0-9]/g, '')
-                    let formatted = ''
-                    for (let i = 0; i < raw.length; i++) {
-                      const char = raw[i]
-                      if (i < 2) {
-                        if (/[0-9]/.test(char)) formatted += char
-                      } else if (i < 7) {
-                        if (/[A-Z]/.test(char)) formatted += char
-                      } else if (i < 11) {
-                        if (/[0-9]/.test(char)) formatted += char
-                      } else if (i === 11) {
-                        if (/[A-Z]/.test(char)) formatted += char
-                      } else if (i === 12) {
-                        if (/[1-9A-Z]/.test(char)) formatted += char
-                      } else if (i === 13) {
-                        if (char === 'Z') formatted += char
-                      } else if (i === 14) {
-                        if (/[A-Z0-9]/.test(char)) formatted += char
-                      }
+                    const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15)
+                    setEpcGstNo(clean)
+                    if (errors.epcGstNo) {
+                      setErrors((prev) => {
+                        const next = { ...prev }
+                        delete next.epcGstNo
+                        return next
+                      })
                     }
-                    setEpcGstNo(formatted)
-                    if (formatted.length === 15) {
-                      autoVerifyGstIfReady(formatted)
+                    if (clean.length === 15 && verifyGst) {
+                      autoVerifyGstIfReady(clean)
                     }
                   }}
                   status={errors.epcGstNo ? 'error' : undefined}
@@ -758,8 +780,36 @@ function ReplacementPage() {
             </div>
 
             <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1 items-start">
-              <ToggleField label="Product Name right?" value={capacityRight} onChange={setCapacityRight} error={errors.capacityRight} />
-              <ToggleField label="Serial no right?" value={serialNoRight} onChange={setSerialNoRight} error={errors.serialNoRight} />
+              <ToggleField
+                label="Product Name right?"
+                value={capacityRight}
+                onChange={(val) => {
+                  setCapacityRight(val)
+                  if (errors.capacityRight) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.capacityRight
+                      return next
+                    })
+                  }
+                }}
+                error={errors.capacityRight}
+              />
+              <ToggleField
+                label="Serial no right?"
+                value={serialNoRight}
+                onChange={(val) => {
+                  setSerialNoRight(val)
+                  if (errors.serialNoRight) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.serialNoRight
+                      return next
+                    })
+                  }
+                }}
+                error={errors.serialNoRight}
+              />
               <FormInput
                 label="Client contact no"
                 required
@@ -775,7 +825,15 @@ function ReplacementPage() {
                       formatted += char
                     }
                   }
-                  setClientContactNo(formatted)
+                  const resVal = formatted.slice(0, 10)
+                  setClientContactNo(resVal)
+                  if (errors.clientContactNo) {
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.clientContactNo
+                      return next
+                    })
+                  }
                 }}
                 error={errors.clientContactNo}
                 maxLength={10}
@@ -800,11 +858,44 @@ function ReplacementPage() {
               </div>
             </div>
 
-            {/* Conditional inputs if toggles are false */}
             {(capacityRight === false || serialNoRight === false) && (
               <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                {capacityRight === false ? <FormInput label="Correct Product Name" required value={correctCapacity} onChange={setCorrectCapacity} error={errors.correctCapacity} /> : <div />}
-                {serialNoRight === false ? <FormInput label="Correct Serial No" required value={correctSerialNo} onChange={setCorrectSerialNo} error={errors.correctSerialNo} /> : <div />}
+                {capacityRight === false ? (
+                  <FormInput
+                    label="Correct Product Name"
+                    required
+                    value={correctCapacity}
+                    onChange={(val) => {
+                      setCorrectCapacity(val)
+                      if (errors.correctCapacity) {
+                        setErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.correctCapacity
+                          return next
+                        })
+                      }
+                    }}
+                    error={errors.correctCapacity}
+                  />
+                ) : <div />}
+                {serialNoRight === false ? (
+                  <FormInput
+                    label="Correct Serial No"
+                    required
+                    value={correctSerialNo}
+                    onChange={(val) => {
+                      setCorrectSerialNo(val)
+                      if (errors.correctSerialNo) {
+                        setErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.correctSerialNo
+                          return next
+                        })
+                      }
+                    }}
+                    error={errors.correctSerialNo}
+                  />
+                ) : <div />}
               </div>
             )}
 
@@ -870,6 +961,13 @@ function ReplacementPage() {
                       setPincodeId(pin.id)
                       setPincode(String(pin.pinCode || pin.pin_name || ''))
                       setSelectedPin(pin)
+                      if (errors.pincode) {
+                        setErrors((prev) => {
+                          const next = { ...prev }
+                          delete next.pincode
+                          return next
+                        })
+                      }
                     }
                   }}
                   onInputKeyDown={(e) => {
