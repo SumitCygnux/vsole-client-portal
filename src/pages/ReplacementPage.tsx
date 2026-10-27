@@ -33,6 +33,49 @@ type Complaint = {
 
 type FormErrors = Record<string, string>
 
+const DRAFT_STORAGE_KEY = 'vsole_replacement_form_draft'
+
+interface FormDraft {
+  complaintNo: string
+  selectedComplaint: Complaint | null
+  capacityRight: boolean | null
+  serialNoRight: boolean | null
+  correctCapacity: string
+  correctSerialNo: string
+  epcName: string
+  epcGstNo: string
+  dispatchAddress: string
+  pincode: string
+  pincodeId: string | null
+  selectedPin: any
+  clientContactNo: string
+  receiverName: string
+  receiverContactNumber: string
+  typeOfForm: string
+  verifyGst: boolean
+  timestamp: number
+}
+
+const getSavedDraft = (urlComplaint?: string | null): FormDraft | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed: FormDraft = JSON.parse(raw)
+    // Expire draft after 24 hours
+    if (Date.now() - (parsed.timestamp || 0) > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
+      return null
+    }
+    // If URL has a specific complaint and draft is for a different one, ignore draft
+    if (urlComplaint && parsed.complaintNo && parsed.complaintNo !== urlComplaint) {
+      return null
+    }
+    return parsed
+  } catch (e) {
+    return null
+  }
+}
+
 function ReplacementPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -42,34 +85,42 @@ function ReplacementPage() {
   const [loadingRecord, setLoadingRecord] = useState(false)
   const [recordStatus, setRecordStatus] = useState<string>('')
 
+  const initialDraft = useMemo(() => {
+    if (isEditMode) return null
+    return getSavedDraft(complaintQuery)
+  }, [isEditMode, complaintQuery])
+
   const [formDate] = useState(() => dayjs())
 
-  const [complaintSearch, setComplaintSearch] = useState('')
-  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
+  const [complaintSearch, setComplaintSearch] = useState(() => initialDraft?.complaintNo || complaintQuery || '')
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(() => initialDraft?.selectedComplaint || null)
   const [complaintError, setComplaintError] = useState('')
 
-  const [capacityRight, setCapacityRight] = useState<boolean | null>(true)
-  const [serialNoRight, setSerialNoRight] = useState<boolean | null>(true)
-  const [correctCapacity, setCorrectCapacity] = useState('')
-  const [correctSerialNo, setCorrectSerialNo] = useState('')
+  const [capacityRight, setCapacityRight] = useState<boolean | null>(() => initialDraft ? initialDraft.capacityRight : true)
+  const [serialNoRight, setSerialNoRight] = useState<boolean | null>(() => initialDraft ? initialDraft.serialNoRight : true)
+  const [correctCapacity, setCorrectCapacity] = useState(() => initialDraft?.correctCapacity || '')
+  const [correctSerialNo, setCorrectSerialNo] = useState(() => initialDraft?.correctSerialNo || '')
 
-  const [epcName, setEpcName] = useState('')
-  const [epcGstNo, setEpcGstNo] = useState('')
-  const [dispatchAddress, setDispatchAddress] = useState('')
-  const [pincode, setPincode] = useState('')
-  const [pincodeId, setPincodeId] = useState<string | null>(null)
-  const [selectedPin, setSelectedPin] = useState<any>(null)
-  const [clientContactNo, setClientContactNo] = useState('')
-  const [receiverName, setReceiverName] = useState('')
-  const [receiverContactNumber, setReceiverContactNumber] = useState('')
-  const [typeOfForm, setTypeOfForm] = useState<string>('replacement')
+  const [epcName, setEpcName] = useState(() => initialDraft?.epcName || '')
+  const [epcGstNo, setEpcGstNo] = useState(() => initialDraft?.epcGstNo || '')
+  const [dispatchAddress, setDispatchAddress] = useState(() => initialDraft?.dispatchAddress || '')
+  const [pincode, setPincode] = useState(() => initialDraft?.pincode || '')
+  const [pincodeId, setPincodeId] = useState<string | null>(() => initialDraft?.pincodeId || null)
+  const [selectedPin, setSelectedPin] = useState<any>(() => initialDraft?.selectedPin || null)
+  const [clientContactNo, setClientContactNo] = useState(() => initialDraft?.clientContactNo || '')
+  const [receiverName, setReceiverName] = useState(() => initialDraft?.receiverName || '')
+  const [receiverContactNumber, setReceiverContactNumber] = useState(() => initialDraft?.receiverContactNumber || '')
+  const [typeOfForm, setTypeOfForm] = useState<string>(() => initialDraft?.typeOfForm || 'replacement')
   
-  const [verifyGst, setVerifyGst] = useState(false)
+  const [verifyGst, setVerifyGst] = useState(() => initialDraft?.verifyGst ?? false)
   const [gstVerifyLoading, setGstVerifyLoading] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
-  const [complaintOptions, setComplaintOptions] = useState<{ label: string, value: string }[]>([])
+  const [complaintOptions, setComplaintOptions] = useState<{ label: string, value: string }[]>(() => {
+    const saved = initialDraft?.complaintNo || complaintQuery
+    return saved ? [{ label: saved, value: saved }] : []
+  })
   const [fetchingComplaints, setFetchingComplaints] = useState(false)
 
   const [complaintPage, setComplaintPage] = useState(1)
@@ -94,7 +145,14 @@ function ReplacementPage() {
           label: c.complaint_no,
           value: c.complaint_no
         }))
-        setComplaintOptions(prev => append ? [...prev, ...newOptions] : newOptions)
+        setComplaintOptions(prev => {
+          const merged = append ? [...prev, ...newOptions] : newOptions
+          const activeComplaint = complaintSearch || selectedComplaint?.complaint_no
+          if (activeComplaint && !merged.some(o => o.value === activeComplaint)) {
+            return [{ label: activeComplaint, value: activeComplaint }, ...merged]
+          }
+          return merged
+        })
         setHasMoreComplaints(page < (res.pagination?.totalPages || 1))
         setComplaintPage(page)
       }
@@ -103,7 +161,7 @@ function ReplacementPage() {
     } finally {
       setFetchingComplaints(false)
     }
-  }, [])
+  }, [complaintSearch, selectedComplaint?.complaint_no])
 
   useEffect(() => {
     if (localStorage.getItem('authToken')) {
@@ -129,7 +187,12 @@ function ReplacementPage() {
     }, 300)
   }
 
-  const [pincodes, setPincodes] = useState<any[]>([])
+  const [pincodes, setPincodes] = useState<any[]>(() => {
+    if (initialDraft?.selectedPin) {
+      return [initialDraft.selectedPin]
+    }
+    return []
+  })
   const [fetchingPincodes, setFetchingPincodes] = useState(false)
   const [pincodePage, setPincodePage] = useState(1)
   const [hasMorePincodes, setHasMorePincodes] = useState(true)
@@ -143,7 +206,13 @@ function ReplacementPage() {
       const res = await get(`${GET_PIN_DROPDOWN}?limit=50&page=${page}&search=${encodeURIComponent(search)}`)
       if (reqId !== pincodesReqRef.current) return // stale response, ignore
       if (res.status && res.data) {
-        setPincodes(prev => append ? [...prev, ...res.data] : res.data)
+        setPincodes(prev => {
+          const list = append ? [...prev, ...res.data] : res.data
+          if (selectedPin && !list.some((p: any) => p.id === selectedPin.id)) {
+            return [selectedPin, ...list]
+          }
+          return list
+        })
         setHasMorePincodes(page < (res.pagination?.totalPages || 1))
         setPincodePage(page)
       }
@@ -153,7 +222,7 @@ function ReplacementPage() {
     } finally {
       if (reqId === pincodesReqRef.current) setFetchingPincodes(false)
     }
-  }, [])
+  }, [selectedPin])
 
   useEffect(() => {
     fetchPincodes('', 1, false)
@@ -178,18 +247,38 @@ function ReplacementPage() {
   }
 
   const state = useMemo(() => {
-    if (selectedPin) return selectedPin.state_id?.name || selectedPin.state_id?.state_name || ''
+    if (selectedPin) {
+      return (
+        selectedPin.state_id?.name ||
+        selectedPin.state_id?.state_name ||
+        selectedPin.state_name ||
+        selectedPin.state ||
+        ''
+      )
+    }
     return ''
   }, [selectedPin])
 
   const city = useMemo(() => {
-    if (selectedPin) return selectedPin.city_id?.name || selectedPin.city_id?.city_name || ''
+    if (selectedPin) {
+      return (
+        selectedPin.city_id?.name ||
+        selectedPin.city_id?.city_name ||
+        selectedPin.city_name ||
+        selectedPin.city ||
+        ''
+      )
+    }
     return ''
   }, [selectedPin])
 
   const pincodeOptions = useMemo(() => {
-    return pincodes.map(p => ({ value: p.id, label: String(p.pinCode || p.pin_name) }))
-  }, [pincodes])
+    const list = [...pincodes]
+    if (selectedPin && !list.some(p => p.id === selectedPin.id)) {
+      list.unshift(selectedPin)
+    }
+    return list.map(p => ({ value: p.id, label: String(p.pinCode || p.pin_name || p.pincode || '') }))
+  }, [pincodes, selectedPin])
 
   const autoVerifyGstIfReady = async (rawGst: string, forceVerify = false) => {
     const gst = String(rawGst)
@@ -265,8 +354,23 @@ function ReplacementPage() {
   }
 
   const [verifying, setVerifying] = useState(false)
-  const lastVerifiedRef = useRef<string>('')
+  const lastVerifiedRef = useRef<string>(initialDraft?.complaintNo || '')
   const complaintPasteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const syncComplaintToUrl = (complaintNo: string | null) => {
+    if (isEditMode) return
+    try {
+      const url = new URL(window.location.href)
+      if (complaintNo) {
+        url.searchParams.set('complaint_no', complaintNo)
+      } else {
+        url.searchParams.delete('complaint_no')
+      }
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : '') + url.hash)
+    } catch (e) {
+      // ignore
+    }
+  }
 
   const verifyComplaint = async (rawValue: string) => {
     const value = rawValue?.trim() || ''
@@ -287,6 +391,7 @@ function ReplacementPage() {
         if (!isEditMode && complaint.is_form_fill) {
           setSelectedComplaint(null)
           setComplaintError('A replacement request has already been submitted for this complaint.')
+          syncComplaintToUrl(null)
           return
         }
 
@@ -310,15 +415,23 @@ function ReplacementPage() {
             fin_year: complaint.fin_year
           })
           setComplaintSearch(complaint.complaint_no)
+          syncComplaintToUrl(complaint.complaint_no)
           setComplaintOptions(prev => {
             if (prev.some(o => o.value === complaint.complaint_no)) return prev
             return [{ label: complaint.complaint_no, value: complaint.complaint_no }, ...prev]
           })
           setComplaintError('')
-          setCapacityRight(true)
-          setSerialNoRight(true)
-          setCorrectCapacity('')
-          setCorrectSerialNo('')
+
+          const isSameComplaint =
+            selectedComplaint?.complaint_no === complaint.complaint_no ||
+            initialDraft?.complaintNo === complaint.complaint_no
+          if (!isSameComplaint) {
+            setCapacityRight(true)
+            setSerialNoRight(true)
+            setCorrectCapacity('')
+            setCorrectSerialNo('')
+          }
+
           setErrors((prev) => {
             const next = { ...prev }
             delete next.complaintNo
@@ -327,14 +440,17 @@ function ReplacementPage() {
         } else {
           setSelectedComplaint(null)
           setComplaintError('This complaint is closed or resolved.')
+          syncComplaintToUrl(null)
         }
       } else {
         setSelectedComplaint(null)
         setComplaintError('Complaint not found.')
+        syncComplaintToUrl(null)
       }
     } catch (error) {
       setSelectedComplaint(null)
       setComplaintError('Complaint not found or invalid.')
+      syncComplaintToUrl(null)
     } finally {
       setVerifying(false)
     }
@@ -346,6 +462,12 @@ function ReplacementPage() {
       setComplaintSearch('')
       setSelectedComplaint(null)
       setComplaintError('')
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY)
+      } catch (e) {
+        // ignore
+      }
+      syncComplaintToUrl(null)
       return
     }
     const trimmed = value.trim()
@@ -457,6 +579,90 @@ function ReplacementPage() {
     }
   }, [complaintSearch])
 
+  // Automatically persist form draft to localStorage so background tab switching or reloads retain entered data
+  useEffect(() => {
+    if (isEditMode) return
+
+    const hasAnyData = !!(
+      complaintSearch ||
+      selectedComplaint ||
+      epcName ||
+      epcGstNo ||
+      dispatchAddress ||
+      pincode ||
+      clientContactNo ||
+      receiverName ||
+      receiverContactNumber
+    )
+
+    if (!hasAnyData) {
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY)
+      } catch (e) {
+        // ignore
+      }
+      return
+    }
+
+    const draft: FormDraft = {
+      complaintNo: complaintSearch || selectedComplaint?.complaint_no || '',
+      selectedComplaint,
+      capacityRight,
+      serialNoRight,
+      correctCapacity,
+      correctSerialNo,
+      epcName,
+      epcGstNo,
+      dispatchAddress,
+      pincode,
+      pincodeId,
+      selectedPin,
+      clientContactNo,
+      receiverName,
+      receiverContactNumber,
+      typeOfForm,
+      verifyGst,
+      timestamp: Date.now(),
+    }
+
+    try {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+    } catch (e) {
+      console.error('Failed to save replacement form draft:', e)
+    }
+  }, [
+    isEditMode,
+    complaintSearch,
+    selectedComplaint,
+    capacityRight,
+    serialNoRight,
+    correctCapacity,
+    correctSerialNo,
+    epcName,
+    epcGstNo,
+    dispatchAddress,
+    pincode,
+    pincodeId,
+    selectedPin,
+    clientContactNo,
+    receiverName,
+    receiverContactNumber,
+    typeOfForm,
+    verifyGst,
+  ])
+
+  // Protect against accidental loss when switching/closing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isEditMode && (complaintSearch || epcName || clientContactNo || receiverName)) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isEditMode, complaintSearch, epcName, clientContactNo, receiverName])
+
   const validate = useCallback(() => {
     const newErrors: FormErrors = {}
 
@@ -528,7 +734,14 @@ function ReplacementPage() {
     setReceiverName('')
     setReceiverContactNumber('')
     setTypeOfForm('replacement')
+    setVerifyGst(false)
     setErrors({})
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
+      syncComplaintToUrl(null)
+    } catch (e) {
+      // ignore
+    }
   }
 
   const handleSubmit = async () => {
